@@ -1,0 +1,296 @@
+
+#
+# Program name
+#
+PROGNAME=blink
+
+#
+# Defines the part type that this project uses.
+#
+PART=STM32L476
+# Used to define part in header file
+PARTCLASS=STM32L476xx
+# Used to find correct CMSIS include file
+PARTCLASSCMSIS=STM32L4xx
+
+#
+# Source files
+#
+SRCFILES=$(wildcard *.c)
+#SRCFILES= main.c
+
+
+#
+# Include the common make definitions.
+#
+PREFIX:=arm-none-eabi
+
+#
+# CMSIS Dir
+#
+CMSISDIR=../STM32Cube_FW_L4_V1.2.0/Drivers/CMSIS
+
+###############################################################################
+# Generally it is not needed to modify the following lines                    #
+###############################################################################
+
+#
+# Main target
+#
+default: all
+
+#
+# Coment to have verbose output
+MAKEFLAGS+= --silent
+
+#
+# Folder for object files
+#
+OBJDIR=gcc
+
+#
+# Object files
+#
+OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
+
+# Set the compiler CPU/FPU options.
+#
+CPUFLAGS=-mcpu=cortex-m4
+FPUFLAGS=-mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+
+#
+# Include path
+#
+CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
+CMSISINCDIR=${CMSISDIR}/Include
+INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR}
+#
+#
+# The flags passed to the assembler.
+#
+AFLAGS=-mthumb \
+       ${CPUFLAGS}  \
+       ${FPUFLAGS}  \
+       $(addprefix -I ,${INCLUDEPATH})           \
+
+#
+# The flags passed to the compiler.
+#
+CFLAGS=-mthumb             \
+       ${CPUFLAGS}              \
+       ${FPUFLAGS}              \
+       $(addprefix -I ,${INCLUDEPATH})           \
+       -D${PARTCLASS}            \
+       -ffunction-sections \
+       -fdata-sections     \
+       -std=c99            \
+       -Wall               \
+       -pedantic           \
+       -DPART_${PART}
+
+#
+# The command to flash the device
+#
+FLASHER=st-flash
+
+#
+# The command for calling the compiler.
+#
+CC=${PREFIX}-gcc
+
+#
+# The command for calling the library archiver.
+#
+AR=${PREFIX}-ar
+
+#
+# The command for calling the linker.
+#
+LD=${PREFIX}-ld
+
+#
+# Debugger
+#
+GDB=$(PREFIX)-gdb
+
+#
+# The flags passed to the linker.
+#
+LDFLAGS=--gc-sections
+
+#
+#
+#
+
+#
+# Get the location of libgcc.a from the GCC front-end.
+#
+LIBGCC:=${shell ${CC} ${CFLAGS} -print-libgcc-file-name}
+
+#
+# Get the location of libc.a from the GCC front-end.
+#
+LIBC:=${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
+
+#
+# Get the location of libm.a from the GCC front-end.
+#
+LIBM:=${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
+
+#
+# The command for extracting images from the linked executables.
+#
+OBJCOPY=${PREFIX}-objcopy
+
+#
+# The command for disassembly
+#
+OBJDUMP=${PREFIX}-objdump
+
+#
+# Flags for disassembler
+#
+ODFLAGS=-S -D
+
+#
+# The command for listing size of code
+#
+OBJSIZE=${PREFIX}-size
+
+#
+# The command for listing symbol table
+#
+OBJNM=${PREFIX}-nm
+
+#
+# Tell the compiler to include debugging information if the DEBUG environment
+# variable is set.
+#
+ifneq ($DEBUG,)
+CFLAGS+=-g -D DEBUG -O0
+else
+CFLAGS+=-Os
+endif
+
+#
+#
+#
+DEPFLAGS=-MT $@  -MMD -MP -MF ${OBJDIR}/$*.d
+#
+# Linker script
+#
+#LINKERSCRIPT=$(PROGNAME).ld
+LINKERSCRIPT=$(shell echo $(PART)| tr A-Z a-z).ld
+
+#
+# Entry Point
+#
+ENTRY=Reset_Handler
+
+#
+# Editor to be used
+#
+EDITOR=gedit
+
+#
+# The rule for building the object file from each C source file.
+#
+${OBJDIR}/%.o: %.c
+	@echo "  Compiling           ${<}";
+	${CC} -c ${CFLAGS} -D${OBJDIR} ${DEPFLAGS} -o ${@} ${<}
+
+#
+# The rule for building the object file from each assembly source file.
+#
+${OBJDIR}/%.o: %.S
+	@echo "  Assembling          ${<}";
+	${CC} -c ${AFLAGS} -D${OBJDIR} -o ${@} -c ${<}
+
+#
+# The rule for creating an object library.
+#
+${OBJDIR}/%.a:
+	@echo "  Archiving           ${@}";
+	${AR} -cr ${@} ${^}
+
+#
+# The rule for linking the application.
+#
+${OBJDIR}/%.axf:
+	@echo "  Linking             ${@} ";
+	${LD} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
+	      ${LDFLAGS} -o ${@} $(OBJFILES) \
+	      '${LIBM}' '${LIBC}' '${LIBGCC}'
+
+${OBJDIR}/%.bin: ${OBJDIR}/%.axf
+	@echo "  Generating binary   ${@} ";
+	${OBJCOPY} -O binary ${^} ${@}
+
+
+
+#
+# The default rule, which causes the $(PROGNAME) example to be built.
+#
+all: ${OBJDIR} ${OBJDIR}/$(PROGNAME).bin
+
+#
+# The rule to clean out all the build products.
+#
+clean:
+	rm -rf ${OBJDIR} ${wildcard *~} && echo "Done."
+
+#
+# The rule to transfer to board
+#
+burn: deploy
+deploy: ${OBJDIR}/$(PROGNAME).bin
+	sudo ${FLASHER} write $^ 0x8000000
+
+#
+# Disassembling
+#
+disassembly:$(OBJDIR)/$(PROGNAME).dump
+dump: disassembly
+$(OBJDIR)/$(PROGNAME).dump: $(OBJDIR)/$(PROGNAME).axf
+	@echo "  Disassembling       ${^} ";
+	$(OBJDUMP) $(ODFLAGS) $^ > $(OBJDIR)/$(PROGNAME).dump
+
+#
+# List size
+#
+size: $(OBJDIR)/$(PROGNAME).axf
+	$(OBJSIZE) $^
+
+#
+# List size
+#
+nm: $(OBJDIR)/$(PROGNAME).axf
+	$(OBJNM) $^
+
+#
+# The rule to create the target directory.
+#
+${OBJDIR}:
+	mkdir -p ${OBJDIR}
+
+#
+# Rules for building the $(PROGNAME) example.
+#
+${OBJDIR}/$(PROGNAME).bin: ${OBJDIR}/$(PROGNAME).axf
+${OBJDIR}/$(PROGNAME).axf: ${OBJFILES}
+
+#
+# Open files in editor windows
+#
+edit:
+	$(EDITOR) Makefile *.c *.h *.ld &
+#
+#
+#
+debug: $(OBJDIR)/$(PROGNAME).bin
+	$(GDB) $(OBJDIR)/$(PROGNAME).axf
+
+.PHONY: nm size dump disassembly deploy burn clean all editor
+#
+# Dependencies
+#
