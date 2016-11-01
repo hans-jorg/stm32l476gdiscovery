@@ -46,7 +46,7 @@ default: all
 
 #
 # Coment to have verbose output
-#MAKEFLAGS+= --silent
+MAKEFLAGS+= --silent
 
 #
 # Terminal application (used to open new windows in debug)
