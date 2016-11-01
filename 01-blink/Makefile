@@ -188,11 +188,6 @@ FPUFLAGS=-mfpu=fpv4-sp-d16 -mfloat-abi=softfp
 TERMAPP=gnome-terminal
 
 #
-# Default debugger
-#
-debug: gdb
-
-#
 # Folder for object files
 #
 OBJDIR=gcc
@@ -204,19 +199,15 @@ default: help
 #default: build
 
 #
+# Default debugger
+#
+debug: gdb
+
+#
 # Suppress warnings
 # Comment out to have verbose output
 #MAKEFLAGS+= --silent
-#.SILENT:
-
-# CMSIS Dir
-#
-CMSISDIR=../STM32Cube_FW_L4_V1.2.0/Drivers/CMSIS
-
-
-#
-# Location of additional libraries
-#
+.SILENT:
 
 #
 # Serial terminal communication
@@ -260,19 +251,27 @@ TERMAPP=gnome-terminal
 #
 EDITOR=gedit
 
-
-###############################################################################
-# Generally it is not needed to modify the following lines                    #
-###############################################################################
-
+#
+# Path
+#
+OPENOCDDIR=/usr/share/openocd
+# CMSIS Dir
+CMSISDIR=../../STM32Cube_FW_L4_V1.2.0/Drivers/CMSIS
 
 
 #
-# Parameters for OpenOCD
+# Additional libraries
 #
-OPENOCD=openocd
-OPENOCDBOARD=/usr/share/openocd/scripts/board/stm32l4discovery.cfg
-OPENOCDFLASHSCRIPT=$(OBJDIR)/flash.ocd
+#
+
+###############################################################################
+# Generally it is not needed to modify the lines below                        #
+###############################################################################
+
+###############################################################################
+# Commands                                                                    #
+###############################################################################
+
 #
 # The command for calling the compiler.
 #
@@ -289,19 +288,9 @@ AR=${PREFIX}-ar
 LD=${PREFIX}-ld
 
 #
-# The flags passed to the linker.
-#
-LDFLAGS=--gc-sections
-
-#
 # Debugger
 #
 GDB=$(PREFIX)-gdb
-
-#
-# The flags passed to the debugger
-#
-GDBFLAGS=-x $(GDBINIT) -n
 
 #
 # Tool to generate documentation
@@ -309,9 +298,60 @@ GDBFLAGS=-x $(GDBINIT) -n
 DOXYGEN=doxygen
 
 #
+# The command for extracting images from the linked executables.
 #
+OBJCOPY=${PREFIX}-objcopy
+
+#
+# The command for disassembly
+#
+OBJDUMP=${PREFIX}-objdump
+
+#
+# The command for listing size of code
+#
+OBJSIZE=${PREFIX}-size
+
+#
+# The command for listing symbol table
+#
+OBJNM=${PREFIX}-nm
+
+
+###############################################################################
+# Commands parameters                                                         #
+###############################################################################
+
+#
+# The flags passed to the linker.
+#
+LDFLAGS=--gc-sections
+
+#
+# The flags passed to the debugger
+#
+GDBFLAGS=-x $(GDBINIT) -n
+
+#
+# Parameters for OpenOCD
+#
+OPENOCD=openocd
+OPENOCDBOARD=$(OPENOCDDIR)/scripts/board/stm32l4discovery.cfg
+OPENOCDFLASHSCRIPT=$(OBJDIR)/flash.ocd
+
+#
+# Configuration file for GDB
 #
 GDBINIT=$(OBJDIR)/gdbinit
+
+#
+# Flags for disassembler
+#
+ODFLAGS=-S -D
+
+###############################################################################
+# Compilation parameters                                                      #
+###############################################################################
 
 #
 # Get the location of libgcc.a from the GCC front-end.
@@ -329,31 +369,6 @@ LIBC:=${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
 LIBM:=${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
 
 #
-# The command for extracting images from the linked executables.
-#
-OBJCOPY=${PREFIX}-objcopy
-
-#
-# The command for disassembly
-#
-OBJDUMP=${PREFIX}-objdump
-
-#
-# Flags for disassembler
-#
-ODFLAGS=-S -D
-
-#
-# The command for listing size of code
-#
-OBJSIZE=${PREFIX}-size
-
-#
-# The command for listing symbol table
-#
-OBJNM=${PREFIX}-nm
-
-#
 # Object files
 #
 OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
@@ -363,7 +378,7 @@ OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
 #
 CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
 CMSISINCDIR=${CMSISDIR}/Include
-INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR}
+INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR} 
 
 #
 #

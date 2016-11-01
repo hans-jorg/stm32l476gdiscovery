@@ -1,11 +1,13 @@
 
 
 PROJECTS=`ls -d [012]*`
+.SILENT:
 
 default:
-	echo "$(PROJECTS)"
-	@echo "Use one of the options: all clean zip"
+	@echo "Use one of the options: build clean zip"
 	@exit 0
+
+all: build
 
 clean:
 	@echo "Cleaning ..."
@@ -15,6 +17,6 @@ zip: clean
 	@echo "Zipping ..."
 	@for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Zipping $$i ..." ; zip -r $$i.zip $$i ; fi; done
 
-all:
+build:
 	@echo "Building ..."
-	@for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Building $$i ..." ; ( cd $$i;  make ); fi; done
+	@for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Building $$i ..." ; ( cd $$i;  make build ); fi; done
