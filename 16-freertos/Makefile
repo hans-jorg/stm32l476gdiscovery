@@ -298,7 +298,7 @@ FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_1.c
 #FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_5.c
 #compiler and cpu specific files
 FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/portable/GCC/ARM_CM4F/port.c
-
+FREERTOSFLAGS=-DENABLE_FPU
 #
 FREERTOSOBJFILES2=$(notdir $(FREERTOSSRCFILES:.c=.o))
 
@@ -445,7 +445,8 @@ CFLAGS=-mthumb             \
        -fdata-sections     \
        -std=c99            \
        -pedantic           \
-       -DPART_${PART}
+       -DPART_${PART}      \
+        $(FREERTOSFLAGS)
 
 #
 # Tell the compiler to include debugging information if the DEBUG environment
