@@ -4,9 +4,9 @@
 #
 #
 #  @file     Makefile
-#  @brief    General makefile for TM4C123
-#  @version  V1.1
-#  @date     30/10/2016
+#  @brief    General makefile for Cortex M Microcontrollers
+#  @version  V1.2
+#  @date     20/04/2017
 #
 #  @note     CMSIS library used
 #
@@ -37,7 +37,7 @@
 #
 # Program name
 #
-PROGNAME=blink
+PROGNAME=joystick
 
 #
 # Defines the part type that this project uses.

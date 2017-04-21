@@ -3,7 +3,7 @@
  * @file     main.c
  * @brief    Blink LEDs using counting delays and CMSIS
  * @version  V1.0
- * @date     23/01/2016
+ * @date     31/10/2016
  *
  * @note     The blinking frequency depends on core frequency
  * @note     Direct access to registers
@@ -69,4 +69,6 @@ int main(void) {
        GPIOB->ODR ^= (1 << LED_RED);       // Use XOR to toggle output
        GPIOE->ODR ^= (1 << LED_GREEN);     // Use XOR to toggle output
     }
+
+    /* NEVER */
 }
