@@ -134,6 +134,6 @@ uint32_t pinin,pinout;
     pinout = GPIO_GETPORTB(output);
     pinin  = GPIO_GETPORTB(input);
 
-    GPIO_ConfigurePort(GPIOE,pinout,pinin);
+    GPIO_ConfigurePort(GPIOB,pinout,pinin);
 
 }

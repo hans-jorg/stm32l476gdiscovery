@@ -57,22 +57,6 @@
 
 
 /**
- * @brief Quick and dirty delay routine
- *
- * It gives approximately 1ms delay at 4 MHz (MSI)
- *
- */
-
-void ms_delay(volatile int ms) {
-   while (ms-- > 0) {
-      volatile int x=7000;
-      while (x-- > 0)
-         __NOP();
-   }
-}
-
-
-/**
  * @brief  GPIO configuration
  *
  * MODEx Register : Mode register
@@ -100,7 +84,7 @@ void ms_delay(volatile int ms) {
  *           1 bit for each pin, OD15..0
  */
 ///@{
-#define GPIO_MODE_IN            0
+#define GPIO_MODE_INP           0
 #define GPIO_MODE_OUT           1
 #define GPIO_MODE_ALT           2
 #define GPIO_MODE_ANA           3
@@ -121,115 +105,6 @@ void ms_delay(volatile int ms) {
 
 
 /**
- * @brief GPIO Abstraction
- *
- * @note  To use an unified approach to address GPIO bit in 2 ports, pins of different ports
- *        are mapped to low and high bit
- *
- */
-
-#define MKWORD(PE,PB) ((PE)<<16)|((PB)&0xFFFF)
-#define GETPORTB(X) ((X)&0xFFFF)
-#define GETPORTE(X) ((X)>>16)
-
-/**
- * @brief Generates a word with 2-bit fields set according another word with 1-bit field.
- *        Each field is filled with the value v.
- *
- * @note  v must be 2 bit wide and not equal zero
- *
- */
-static uint32_t mk2from1(uint32_t m, uint32_t v) {
-uint32_t x;
-
-    if( !v )
-        return 0;
-
-    x = 0;
-    while( v ) {
-        if( m& 1 ) {
-            x |= v;
-        }
-        m>>=1;
-        v<<=2;
-    }
-    return x;
-}
-
-static void GPIO_ConfigurePort(GPIO_TypeDef *port, uint32_t input, uint32_t output) {
-uint32_t v1,v2,v,m,pinin,pinout;
-
-    // Set mode
-    m =  mk2from1(pinout|pinin,GPIO_MODE_MASK);
-    v1 = mk2from1(pinout,GPIO_MODE_OUT);
-    v2 = mk2from1(pinin,GPIO_MODE_IN);
-    v = v1 | v2;
-    BitFieldSet(port->MODER,m,v);
-
-    // Set output speed
-    m = mk2from1(pinout,GPIO_OSPEED_MASK);
-    v1 = mk2from1(pinout,GPIO_OSPEED_VERYHIGH);
-    BitFieldSet(port->OSPEEDR,m,v1);
-
-    // Set pullup
-    m =  mk2from1(pinout|pinin,GPIO_PUPD_MASK);
-    v1 = mk2from1(pinout|pinin,GPIO_PUPD_UP);
-    BitFieldSet(port->PUPDR,m,v1);
-
-}
-
-void GPIO_Init(uint32_t input, uint32_t output) {
-uint32_t pinin,pinout;
-
-    BitSet(RCC->AHB2ENR,RCC_AHB2ENR_GPIOEEN);        // Enable GPIO Port E
-    BitSet(RCC->AHB2ENR,RCC_AHB2ENR_GPIOBEN);        // Enable GPIO Port B
-
-    __DSB();
-
-    // Configure GPIO Port E. Only pins in input and output parameters
-    pinout = GETPORTE(output);
-    pinin  = GETPORTE(input);
-
-    GPIO_ConfigurePort(GPIOE,pinout,pinin);
-
-    // Configure GPIO Port B. Only pins in input and output parameters
-    pinout = GETPORTB(output);
-    pinin  = GETPORTB(input);
-
-    GPIO_ConfigurePort(GPIOB,pinout,pinin);
-
-}
-
-static inline void GPIO_Write(uint32_t zeroes, uint32_t ones) {
-uint32_t pinzeroes,pinones;
-
-    if( GETPORTE(zeroes|ones) ) {
-        pinzeroes = GETPORTE(zeroes);
-        pinones   = GETPORTE(ones);
-        GPIOE->ODR = (GPIOE->ODR&~(pinones|pinzeroes))|pinones;
-    }
-    if( GETPORTB(zeroes|ones) ) {
-        pinzeroes = GETPORTB(zeroes);
-        pinones   = GETPORTB(ones);
-        GPIOB->ODR = (GPIOB->ODR&~(pinones|pinzeroes))|pinones;
-    }
-}
-
-inline void GPIO_Toggle(uint32_t pins) {
-uint32_t p;
-
-    if( GETPORTE(pins) ) {
-        p = GETPORTE(pins);
-        GPIOE->ODR ^= p;
-    }
-    if( GETPORTB(pins) ) {
-        p = GETPORTB(pins);
-        GPIOB->ODR ^= p;
-    }
-}
-
-
-/**
  * @brief LED Symbols
  *
  *     LEDs are in different ports.
@@ -247,23 +122,75 @@ uint32_t p;
  * Red     GPIOB      2
  */
 
-#define LED_GREEN   MKWORD(BIT(8),0)
-#define LED_RED     MKWORD(0,BIT(2))
+#define LED_GREEN_PE_PIN   (8)
+#define LED_RED_PB_PIN     (2)
 
+// Bit masks for ODR (data) register
+#define LED_GREEN_PE            BIT(LED_GREEN_PE_PIN)
+#define LED_RED_PB              BIT(LED_RED_PB_PIN)
+// Bit masks for MODER, OSPEEDR and PUPDR register (2 bit fields)
+// Green LED on Port E
+#define LED_GREEN_PE_MODE       BITFIELD(GPIO_MODE_OUT,LED_GREEN_PE_PIN*2)
+#define LED_GREEN_PE_MODE_M     BITFIELD(GPIO_MODE_MASK,LED_GREEN_PE_PIN*2)
+#define LED_GREEN_PE_OSPEED     BITFIELD(GPIO_OSPEED_VERYHIGH,LED_GREEN_PE_PIN*2)
+#define LED_GREEN_PE_OSPEED_M   BITFIELD(GPIO_OSPEED_MASK,LED_GREEN_PE_PIN*2)
+#define LED_GREEN_PE_PUPD       BITFIELD(GPIO_PUPD_UP,LED_GREEN_PE_PIN*2)
+#define LED_GREEN_PE_PUPD_M     BITFIELD(GPIO_PUPD_MASK,LED_GREEN_PE_PIN*2)
+
+// RED LED on Port E
+#define LED_RED_PB_MODE         BITFIELD(GPIO_MODE_OUT,LED_RED_PB_PIN*2)
+#define LED_RED_PB_MODE_M       BITFIELD(GPIO_MODE_MASK,LED_RED_PB_PIN*2)
+#define LED_RED_PB_OSPEED       BITFIELD(GPIO_OSPEED_VERYHIGH,LED_RED_PB_PIN*2)
+#define LED_RED_PB_OSPEED_M     BITFIELD(GPIO_OSPEED_MASK,LED_RED_PB_PIN*2)
+#define LED_RED_PB_PUPD         BITFIELD(GPIO_PUPD_UP,LED_RED_PB_PIN*2)
+#define LED_RED_PB_PUPD_M       BITFIELD(GPIO_PUPD_MASK,LED_RED_PB_PIN*2)
 //@}
+
+
+/**
+ * @brief Quick and dirty delay routine
+ *
+ * It gives approximately 1ms delay at 4 MHz (MSI)
+ *
+ */
+
+void ms_delay(volatile int ms) {
+   while (ms-- > 0) {
+      volatile int x=7000;
+      while (x-- > 0)
+         __NOP();
+   }
+}
+
 
 int main(void) {
 
     //    SystemCoreClockSet(MSI48M_CLOCKSRC, 0, 3, 0);
 
-    GPIO_Init(0,LED_GREEN|LED_RED);
+    BitSet(RCC->AHB2ENR,RCC_AHB2ENR_GPIOEEN);        // Enable GPIO Port E
+    BitSet(RCC->AHB2ENR,RCC_AHB2ENR_GPIOBEN);        // Enable GPIO Port B
 
-    GPIO_Write(LED_GREEN,LED_RED);
+    __DSB();
+
+    // Configurate GPIO for Green LED
+    BitFieldSet(GPIOE->MODER,LED_GREEN_PE_MODE_M,LED_GREEN_PE_MODE);            // Set to output
+    BitFieldSet(GPIOE->OSPEEDR,LED_GREEN_PE_OSPEED_M,LED_GREEN_PE_OSPEED);      // Set to high speed
+    BitFieldSet(GPIOE->PUPDR,LED_GREEN_PE_PUPD_M,LED_GREEN_PE_PUPD_M);          // Turn on pull up
+    BitClear(GPIOE->ODR,LED_GREEN_PE);                                          // Turn off LED
+
+    // Configurate GPIO for Red LED
+    BitFieldSet(GPIOB->MODER,LED_RED_PB_MODE_M,LED_RED_PB_MODE);                // Set to output
+    BitFieldSet(GPIOB->OSPEEDR,LED_RED_PB_OSPEED_M,LED_RED_PB_OSPEED);          // Set to high speed
+    BitFieldSet(GPIOB->PUPDR,LED_RED_PB_PUPD_M,LED_RED_PB_PUPD_M);              // Turn on pull up
+    BitSet(GPIOB->ODR,LED_RED_PB);                                              // Turn on LED
+
+
+
+
 
     for (;;) {
        ms_delay(500);
-       GPIO_Write(LED_RED,LED_GREEN);
-       ms_delay(500);
-       GPIO_Write(LED_GREEN,LED_RED);
+       BitToggle(GPIOB->ODR,LED_RED_PB);
+       BitToggle(GPIOE->ODR,LED_GREEN_PE);
     }
 }
