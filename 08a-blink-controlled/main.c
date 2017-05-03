@@ -132,7 +132,7 @@ void EXTI0_IRQHandler(void) { /* CENTER PIN */
             }
             debounce_counter = 40;
         }
-        EXTI->PR1 |= BIT(0);
+        EXTI->PR1 |= EXTI_PR1_PIF0;
         cnt_red = 0;
         cnt_green = 0;
     };
@@ -144,7 +144,7 @@ void EXTI1_IRQHandler(void) { /* LEFT PIN */
         /* Decrease period of green LED blinking  */
         if( semiperiod_green > (semiperiod_min+semiperiod_step) )
             semiperiod_green -= semiperiod_step;
-        EXTI->PR1 |= BIT(1);
+        EXTI->PR1 |= EXTI_PR1_PIF1;
     }
     NVIC_ClearPendingIRQ(EXTI1_IRQn);
 }
@@ -154,7 +154,7 @@ void EXTI2_IRQHandler(void) { /* RIGHT PIN */
         /* Increase period of green LED blinking  */
         if( semiperiod_green < (semiperiod_max-semiperiod_step) )
             semiperiod_green += semiperiod_step;
-        EXTI->PR1 |= BIT(2);
+        EXTI->PR1 |= EXTI_PR1_PIF2;
     }
     NVIC_ClearPendingIRQ(EXTI2_IRQn);
 }
@@ -164,7 +164,7 @@ void EXTI3_IRQHandler(void) { /* UP PIN */
         /* Decrease period of red LED blinking  */
         if( semiperiod_red > (semiperiod_min+semiperiod_step) )
             semiperiod_red -= semiperiod_step;
-        EXTI->PR1 |= BIT(3);
+        EXTI->PR1 |= EXTI_PR1_PIF3;
     }
     NVIC_ClearPendingIRQ(EXTI3_IRQn);
 }
@@ -175,7 +175,7 @@ void EXTI9_5_IRQHandler(void) { /* DOWN PIN */
         /* Increase period of red LED blinking  */
         if( semiperiod_red < (semiperiod_max-semiperiod_step) )
             semiperiod_red += semiperiod_step;
-        EXTI->PR1 |= BIT(5);
+        EXTI->PR1 |= EXTI_PR1_PIF5;
     }
     NVIC_ClearPendingIRQ(EXTI9_5_IRQn);
 }
@@ -229,20 +229,23 @@ uint32_t t;
    // __DSB();
 
     /* Enable interrupts on EXTI peripheral according Chapter 14 of RM0351 */
-    EXTI->IMR1  |=  (BIT(0)|BIT(1)|BIT(2)|BIT(3)|BIT(5));   // Enable interrupts on lines 0, 1, 2, 3 and 5
-    EXTI->RTSR1 |=  (BIT(0)|BIT(1)|BIT(2)|BIT(3)|BIT(5));   // Interrrupt on rising edge
-    EXTI->FTSR1 &= ~(BIT(0)|BIT(1)|BIT(2)|BIT(3)|BIT(5));   // No interrupt on falling edge
+    // Enable interrupts on lines 0, 1, 2, 3 and 5
+    EXTI->IMR1  |=  (EXTI_IMR1_IM0|EXTI_IMR1_IM1|EXTI_IMR1_IM2|EXTI_IMR1_IM3|EXTI_IMR1_IM5);
+    // Interrrupt on rising edge
+    EXTI->RTSR1 |=  (EXTI_RTSR1_RT0|EXTI_RTSR1_RT1|EXTI_RTSR1_RT3|EXTI_RTSR1_RT3|EXTI_RTSR1_RT5);
+    // No interrupt on falling edge
+    EXTI->FTSR1 &= ~(EXTI_FTSR1_FT0|EXTI_FTSR1_FT1|EXTI_FTSR1_FT3|EXTI_FTSR1_FT3|EXTI_FTSR1_FT5);
 
     // Enable interrupts from Port A */
     t = SYSCFG->EXTICR[0];
-    SETBITFIELD(t,BITVALUE(7,0),0);                         /* EXTI0 : Center Pin */
-    SETBITFIELD(t,BITVALUE(7,4),0);                         /* EXTI1 : Left Pin */
-    SETBITFIELD(t,BITVALUE(7,8),0);                         /* EXTI2 : Right Pin */
-    SETBITFIELD(t,BITVALUE(7,12),0);                        /* EXTI3 : Up Pin */
+    SETBITFIELD(t,SYSCFG_EXTICR1_EXTI0,0);                         /* EXTI0 : Center Pin */
+    SETBITFIELD(t,SYSCFG_EXTICR1_EXTI1,0);                         /* EXTI1 : Left Pin */
+    SETBITFIELD(t,SYSCFG_EXTICR1_EXTI2,0);                         /* EXTI2 : Right Pin */
+    SETBITFIELD(t,SYSCFG_EXTICR1_EXTI3,0);                         /* EXTI3 : Up Pin */
     SYSCFG->EXTICR[0] = t;
 
     t = SYSCFG->EXTICR[1];
-    SETBITFIELD(t,BITVALUE(7,4),0);                         /* EXTI5 : Down Pin */
+    SETBITFIELD(t,SYSCFG_EXTICR2_EXTI5,0);                         /* EXTI5 : Down Pin */
     SYSCFG->EXTICR[1] = t;
 
     // Configure NVIC to accept interrupts from EXTI */
