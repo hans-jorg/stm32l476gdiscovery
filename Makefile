@@ -1,7 +1,7 @@
 
 
 PROJECTS=`ls -d [012]*`
-.SILENT:
+#.SILENT:
 
 default: build
 
@@ -10,6 +10,8 @@ help:
 	@exit 0
 
 all: build
+
+GENPDF=echo
 
 clean:
 	@echo "Cleaning ..."
@@ -22,3 +24,7 @@ zip: clean
 build:
 	@echo "Building ..."
 	@for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Building $$i ..." ; ( cd $$i;  make build ); fi; done
+
+pdf:
+	echo "Generating PDF"
+	for f in $(wildcard *.odt); do soffice --headless --convert-to pdf $$f; done
