@@ -3,7 +3,9 @@
 PROJECTS=`ls -d [012]*`
 .SILENT:
 
-default:
+default: build
+
+help:
 	@echo "Use one of the options: build clean zip"
 	@exit 0
 

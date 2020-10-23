@@ -1,4 +1,0 @@
-# Run this script using gdb source command
-target extended-remote localhost:4242
-break main
-continue
