@@ -1,7 +1,11 @@
-
+#
+# General make for all projects
+#
+# actions: build, clean, zip, pdf
+#
 
 PROJECTS=`ls -d [012]*`
-#.SILENT:
+.SILENT:
 
 default: build
 
