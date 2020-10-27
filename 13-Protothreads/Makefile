@@ -5,8 +5,8 @@
 #
 #  @file     Makefile
 #  @brief    General Makefile for Cortex-M Processors
-#  @version  V1.2
-#  @date     20/04/2017
+#  @version  V1.3
+#  @date     24/10/2020
 #
 #  @note     CMSIS library used
 #
@@ -28,12 +28,21 @@
 #   @param clean       clean all generated files
 #   @param help        print options (default)
 #
+#  @note    Ported to Windows
 #
-
+#
 ###############################################################################
 # Main parameters                                                             #
 ###############################################################################
 
+#
+# Compatibility Windows/Linux
+#
+ifeq ($(OS),Windows_NT)
+HOSTOS :=Windows
+else
+HOSTOS :=$(shell uname -s)
+endif
 #
 # Program name
 #
@@ -51,13 +60,19 @@ PARTCLASSCMSIS=STM32L4xx
 #
 # Path
 #
+ifeq ($(HOSTOS),Windows)
+# OpenOCD Dir
+OPENOCDDIR=C:\Program Files (x86)\OpenOCD-20200729\share\openocd
+# CMSIS Dir
+CMSISDIR=C:\STM32Cube\STM32CubeL4\Drivers\CMSIS
+else
 # OpenOCD Dir
 OPENOCDDIR=/usr/share/openocd
 # CMSIS Dir
 CMSISDIR=../../STM32CubeL4/Drivers/CMSIS
+endif
 # Protothreads Dir
 PTDIR=../../../pt-1.4
-
 
 #
 # Source files
@@ -76,6 +91,7 @@ SRCFILES=$(wildcard *.c)
 # Include the common make definitions.
 #
 PREFIX:=arm-none-eabi
+
 
 #
 # For gcc-arm-embedded
@@ -247,8 +263,14 @@ TTYPARMS=-D $(TTYTERM) -b $(TTYBAUD)
 #
 # The command to flash the device
 #
+#
+ifeq ($(HOSTOS),Windows)
+FLASHER=ST-LINK_CLI
+#FLASHER=openocd
+else
 FLASHER=st-flash
 #FLASHER=openocd
+endif
 
 
 #
@@ -425,14 +447,18 @@ DEPFLAGS=-MT $@  -MMD -MP -MF ${OBJDIR}/$*.d
 #
 # Linker script
 #
+ifeq ($(HOSTOS),Windows)
+#LINKERSCRIPT=$(PROGNAME).ld
+LINKERSCRIPT= $(PART).ld
+LINKERSCRIPT= stm32l476.ld
+else
 #LINKERSCRIPT=$(PROGNAME).ld
 LINKERSCRIPT=$(shell echo $(PART)| tr A-Z a-z).ld
-
+endif
 #
 # Entry Point
 #
 ENTRY=Reset_Handler
-
 
 ###############################################################################
 # RULES                                                                       #
@@ -504,34 +530,64 @@ usage:
 # The default rule, which causes the $(PROGNAME) example to be built.
 #
 build: ${OBJDIR} ${OBJDIR}/$(PROGNAME).bin
+	echo "Done."
 
 #
 # The rule to clean out all the build products.
 #
+ifeq ($(HOSTOS),Windows)
 clean:
-	rm -rf ${OBJDIR} ${wildcard *~} html latex docs  && echo "Done."
+	del /q /f /s  ${wildcard *~}  > nul 2>&1
+	rmdir /q /f /s  html latex docs $(OBJDIR) > nul 2>&1
+	echo "Done."
+else
+clean:
+	rm -rf ${OBJDIR} ${wildcard *~} html latex docs
+	echo "Done."
+endif
 
 #
 # The rule to transfer binary to board
 #
+# For Linux st-flash or OpenOCD
+# For Windows ST_LINK_CLI
+
 flash: deploy
 burn: deploy
 ifeq ($(FLASHER),st-flash)
 deploy: ${OBJDIR}/$(PROGNAME).bin
 	sudo ${FLASHER} write $^ 0x08000000
-else
+endif
+ifeq ($(FLASHER),openocd)
 deploy: ${OBJDIR}/$(PROGNAME).bin $(OPENOCDFLASHSCRIPT)
 	sudo ${FLASHER} -f $(OPENOCDBOARD) -f $(OPENOCDFLASHSCRIPT)
+endif
+ifeq ($(FLASHER),ST-LINK_CLI)
+deploy: ${OBJDIR}/$(PROGNAME).bin
+	${FLASHER} -c swd -p $^ 0x08000000 -Rst -v
 endif
 
 #
 # Force write to flash memory. Useful in case of recurring write errors
 #
+
+ifeq ($(FLASHER),st-flash)
 force-flash: ${OBJDIR}/$(PROGNAME).bin
 	echo "Press RESET during write"
 	sleep 3
 	sudo ${FLASHER} --reset write  $^ 0x8000000
-
+endif
+ifeq ($(FLASHER),openocd)
+	echo "Press RESET during write"
+	sleep 3
+	sudo ${FLASHER} --reset write  $^ 0x8000000
+endif
+ifeq ($(FLASHER),ST-LINK_CLI)
+force-flash: ${OBJDIR}/$(PROGNAME).bin
+	echo "Press RESET during write"
+	sleep 3
+	${FLASHER} -c swd -p $^ 0x08000000 -Rst -v
+endif
 #
 # Disassembling
 #
@@ -556,8 +612,13 @@ nm: $(OBJDIR)/$(PROGNAME).axf
 #
 # The rule to create the target directory.
 #
+ifeq ($(HOSTOS),Windows)
+${OBJDIR}:
+	mkdir ${OBJDIR}
+else
 ${OBJDIR}:
 	mkdir -p ${OBJDIR}
+endif
 
 #
 # Rules for building the $(PROGNAME) example.
@@ -600,7 +661,7 @@ ddd: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
 # Debug using kdbg GUI
 #
 #kdbg: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-#	kdbg  -r localhost:4242 $(OBJDIR)/$(PROGNAME).axf
+	kdbg  -r localhost:4242 $(OBJDIR)/$(PROGNAME).axf
 
 #
 # Debug using nemiver GUI
@@ -615,10 +676,14 @@ nemiver: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
 gdbserver:
 ifeq ($(FLASHER),st-flash)
 	if [ X"`pidof st-util`" != X ]; then kill `pidof st-util`; fi
-	$(TERMAPP) -e "st-util" &
-else
+endif
+ifeq ($(FLASHER),openocd)
 	$(TERMAPP) -e "openocd -x XXXXXXXXXXX" &
 endif
+ifeq ($(FLASHER),ST-LINK_CLI)
+	$(TERMAPP) -e "openocd -x XXXXXXXXXXX" &
+endif
+
 
 #
 # Debugger initialization scripts
@@ -629,9 +694,16 @@ ifeq ($(FLASHER),st-flash)
 	echo "target extended-remote localhost:4242" >> $(GDBINIT)
 	echo "break main" >> $(GDBINIT)
 	echo "continue" >> $(GDBINIT)
-else
+endif
+ifeq ($(FLASHER),openocd)
 	echo "# Run this script using gdb source command" > $(GDBINIT)
 	echo "target remote localhost:3333" >> $(GDBINIT)
+	echo "break main" >> $(GDBINIT)
+	echo "continue" >> $(GDBINIT)
+endif
+ifeq ($(FLASHER),ST-LINK_CLI)
+	echo "# Run this script using gdb source command" > $(GDBINIT)
+	echo "target extended-remote localhost:4242" >> $(GDBINIT)
 	echo "break main" >> $(GDBINIT)
 	echo "continue" >> $(GDBINIT)
 endif
