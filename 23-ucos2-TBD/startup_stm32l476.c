@@ -353,6 +353,25 @@ unsigned long *pDest;
         *pDest++ = 0;
     }
 
+#ifdef ENABLE_FPU
+#define SCB_CPACR_CP11_M      (3<<22)
+#define SCB_CPACR_CP10_M      (3<<20)
+#define SCB_CPACR_CP11_FULL_V (3<<22)
+#define SCB_CPACR_CP10_FULL_V (3<<20)
+
+    //
+    // Enable the floating-point unit.  This must be done here to handle the
+    // case where main() uses floating-point and the function prologue saves
+    // floating-point registers (which will fault if floating-point is not
+    // enabled).
+
+    //
+    uint32_t t = SCB->CPACR;
+    t &= ~(SCB_CPACR_CP11_M|SCB_CPACR_CP10_M);
+    t |= SCB_CPACR_CP11_FULL_V|SCB_CPACR_CP10_FULL_V ;
+    SCB->CPACR = t;
+#endif
+
     /* Passo 3 : Chamar SystemInit conforme CMSIS */
     SystemInit();
 

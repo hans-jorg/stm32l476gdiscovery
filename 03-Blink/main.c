@@ -1,26 +1,21 @@
 
 /**
  * @file     main.c
- * @brief    Blink LEDs using interrupts and CMSIS
+ * @brief    Blink LEDs using counting delays
  * @version  V1.0
- * @date     23/01/2016
+ * @date     31/10/2016
+ * @version  V1.1
+ * @date     22/04/2017
  *
- * @note     The blinking frequency of the red LED depends on core frequency
+ * @note     The blinking frequency depends on core frequency
  * @note     Direct access to registers
  * @note     No library used
  *
  *
  ******************************************************************************/
 
-
-
-
 #include "stm32l476xx.h"
 #include "system_stm32l476.h"
-
-#include "bitmanip.h"
-#include "gpio.h"
-
 
 /**
  * @brief Quick and dirty delay routine
@@ -31,49 +26,52 @@
 
 void ms_delay(volatile int ms) {
    while (ms-- > 0) {
-      volatile int x=7000;
+      volatile int x=700;
       while (x-- > 0)
          __NOP();
    }
 }
 
-
 /**
- * @brief LED Symbols
+ * @brief The STM32L476 Discovery Board hat two LEDs.
  *
- *     LEDs are in different ports.
- *     In order to avoid wrong use, the port identifier should be appended to the symbol.
- *
- *     It is necessary to have different symbols to configure the GPIO
- *     One to specify bit in the ODR register and another to specify a 2-bit wide field in
- *     MODER,OSPEER and PUPDR registers.
- *     To write on a 2-bit wide field it is necessary to erase all bits on it using a mask.
+ * A red LED on Pin PE8 and a green LED on pin PB2
  *
  */
-/* Bit numbers for LEDS
- * LED     GPIO      Pin
- * Green   GPIOE      8
- * Red     GPIOB      2
- */
 
-#define LED_GREEN   GPIO_MKWORD(BIT(8),0)
-#define LED_RED     GPIO_MKWORD(0,BIT(2))
-
+//@{
+/// Must be Pin numbers not Masks
+/// LED on GPIO Port E
+#define LED_GREEN  (8)
+/// LED on GPIO Port B
+#define LED_RED    (2)
 //@}
-
 
 int main(void) {
 
-    //    SystemCoreClockSet(MSI48M_CLOCKSRC, 0, 3, 0);
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;   // Enable GPIO Port E
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;   // Enable GPIO Port B
 
-    GPIO_Init(0,LED_GREEN|LED_RED);
+    __DSB();
 
-    GPIO_Write(LED_GREEN,LED_RED);
+    /* Clear field and set desired value */
+    GPIOB->MODER   = ((GPIOB->MODER&~(3<<(LED_RED*2)))    | (1<<(LED_RED*2)));   // Set to output
+    GPIOB->OSPEEDR = ((GPIOB->OSPEEDR&~(3<<(LED_RED*2)))  | (3<<(LED_RED*2)));   // Set to high speed
+    GPIOB->PUPDR   = ((GPIOB->PUPDR&~(3<<(LED_RED*2)))    | (1<<(LED_RED*2)));   // Set to pull up
+    GPIOB->ODR    |= (1<<LED_RED);
+
+    GPIOE->MODER   = ((GPIOE->MODER&~(3<<(LED_GREEN*2)))  | (1<<(LED_GREEN*2))); // Set to output
+    GPIOE->OSPEEDR = ((GPIOE->OSPEEDR&~(3<<(LED_GREEN*2)))| (3<<(LED_GREEN*2))); // Set to high speed
+    GPIOE->PUPDR   = ((GPIOE->PUPDR&~(3<<(LED_GREEN*2)))  | (1<<(LED_GREEN*2))); // Set to pull up
+    GPIOE->ODR    &= ~(1<<LED_GREEN);
+
+
 
     for (;;) {
        ms_delay(500);
-       GPIO_Write(LED_RED,LED_GREEN);
-       ms_delay(500);
-       GPIO_Write(LED_GREEN,LED_RED);
+       GPIOB->ODR ^= (1 << LED_RED);       // Use XOR to toggle output
+       GPIOE->ODR ^= (1 << LED_GREEN);     // Use XOR to toggle output
     }
+
+    /* NEVER */
 }
