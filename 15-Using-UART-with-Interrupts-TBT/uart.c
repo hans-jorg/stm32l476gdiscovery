@@ -165,7 +165,7 @@ USART_TypeDef  *uart = UART5;
  ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
  **/
 int
-UART_Init(int uartn, uint32_t info) {
+UART_Init(int uartn, unsigned info) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 
@@ -247,18 +247,18 @@ USART_TypeDef * uart;
 /**
  ** @brief UART Send a character
  **
+ ** @note   It blocks until char is sent
  **/
 int
-UART_WriteChar(int uartn, uint32_t c) {
+UART_WriteChar(int uartn, unsigned c) {
 USART_TypeDef *uart;
 
-
-    uart = uarttab[uartn].device;
-
-    while( (uart->ISR&USART_ISR_TEACK)==0 ) {}
+    // wait until buffer free
+    while ( uarttab[uartn].outbuffer != 0 ) {}
+    // send it
     uart->TDR = c;
 
-    return 0;
+    return 1;
 }
 
 /**
@@ -286,10 +286,10 @@ int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
 
-    uart = uarttab[uartn].device;
+    while( uarttab[uartn].inbuffer == 0 ) {}
 
-    while( (uart->ISR & USART_ISR_RXNE) == 0 ) {}
-    return uart->RDR;
+    return uarttab[uartn].inbuffer;
+
 }
 
 
@@ -328,6 +328,23 @@ USART_TypeDef *uart;
     uart = uarttab[uartn].device;
 
     return uart->ISR;
+
+}
+
+/**
+ ** @brief UART Flush buffers
+ **
+ **/
+int
+UART_Flush(int uartn) {
+USART_TypeDef *uart;
+
+    uart = uarttab[uartn].device;
+
+    uarttab[uartn].inbuffer  = 0;
+    uarttab[uartn].outbuffer = 0;
+
+    return 0;
 
 }
 

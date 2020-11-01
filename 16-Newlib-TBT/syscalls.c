@@ -1,12 +1,66 @@
 /**
- * @file syscalls.c
+ * @file    syscalls.c
  *
  * @note    Following 11. System Calls in Newlib LibC documentation
+ *
+ * @note    Minimal implementation (mostly stubs) for POSIX
+ *          like routines and data
+ *
+ * @note    Contrary to linux/unix, where there is a name space
+ *          pollution between Standard C and POSIX name, all
+ *          names defined here start with _ according to the
+ *          C standard.
+ *
+ * @note    Actually only _read and _write has real implementations
+ *
+ * @note    There is a _main, that is called before main to
+ *          initialize the standard library.
+ *          See startup_STM32L476xx.c
+ *
+ * @note    Function list
+ *
+ *    void _exit(void);
+ *    int _close(int file);
+ *    int _execve(char *name, char **argv, char **env);
+ *    int _fork(void);
+ *    int _fstat(int file, struct stat *st);
+ *    int _getpid(void);
+ *    int _isatty(int file);
+ *    int _kill(int pid, int sig);
+ *    int _link(char *old, char *new);
+ *    int _lseek(int file, int ptr, int dir);
+ *    int _open(const char *name, int flags, int mode);
+ *    int _read(int file, char *ptr, int len);
+ *    caddr_t _sbrk(int incr);
+ *    int _stat(char *file, struct stat *st);
+ *    int _times(struct tms *buf);
+ *    int _unlink(char *name);
+ *    int _wait(int *status);
+ *    int _write(int file, char *ptr, int len);
+ *
+ * @note    Data list
+ *    extern char *__env[1];
+ *    extern char **environ;
+ *
  */
 
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/times.h>
+
+#include "syscalls.h"
+#include "ttyemul.h"
+
+/// CMSIS functions for microcontroller
+#include "stm32l476xx.h"
+
+/**
+ * @brief   access to SP to detect memory overflow
+ */
+
+static inline char * GetStackPointer(void) { return (char *) __get_MSP(); }
+
+
 
 /**
  * @brief errno
@@ -33,168 +87,13 @@
 #undef errno
 extern int errno;
 
-
-/**
- * @brief   including CMSIS functions
- */
-
-#include "stm32l476xx.h"
-
-/**
- * @brief compatibility layer
- */
-
-static inline char * GetStackPointer(void) { return (char *) __get_MSP(); }
-
-/**
- *  @brief
- */
-#include "syscalls.h"
-
-/**
- * @brief Interface to a serial interface for a minimal implementation
- *
- */
-//@{
-#include "uart.h"
-
-/// @brief SerialInit
-
-static inline void SerialInit(int chn) {
-    UART_Init(  UART2,
-                UART_NOPARITY|UART_8BITS|UART_2_STOP
-               |UART_BAUD_9600|UART_OVER8);
-}
-
-/// @brief SerialWrite
-static inline void SerialWrite(int chn, char c)  {
-    UART_WriteChar(UART2,c);
-}
-
-/// @brief SerialRead
-static inline int  SerialRead(int chn) {
-    return UART_ReadChar(UART2);
-}
-
-/// @brief SerialStatus
-static inline int  SerialStatus(int chn) {
-    return UART_GetStatus(UART2);
-}
-
-/// @brief SerialFlush
-static inline int  SerialFlush(int chn) {
-    return UART_Flush(UART2);
-}
-
-/// @brief SerialFlush
-static inline void  SerialReset(int chn) {
-    UART_Reset(UART2);
-}
-
-//@}
-
-
-
-
-/**
- *  @brief  TTY interface
- *
- *  @brief  TTY_write and TTY_READ
- *
- */
-#define TTY_ICRLF       0x0001
-#define TTY_OCRLF       0x0002
-#define TTY_IECHO       0x0004
-#define TTY_UNBUFF      0x0010
-
-#define TTY_BS          '\b'
-
-static unsigned ttyconfig = TTY_IECHO|TTY_OCRLF|TTY_ICRLF;
-
-/**
- *  @brief  tty_write
- */
-int tty_write(int chn, char *ptr, int len) {
-int cnt;
-char ch;
-int i;
-
-    cnt = 0;
-    for (i = 0; i < len; i++) {
-        ch = *ptr++;
-        if( (ch == '\n') && ttyconfig&TTY_OCRLF ) {
-            SerialWrite(chn,'\r');
-            cnt++;
-        }
-        SerialWrite(chn,ch);
-        cnt++;
-    }
-    return cnt;
-}
-
-/**
- *  @brief  tty_read_un
- *  @note   unbuffered
- *  @note   No timeout yet
- */
-int tty_read_un(int chn, char *ptr, int len) {
-int cnt;
-int ch;
-
-    for(cnt=0;cnt < len;cnt++ ) {
-        ch = SerialRead(chn);
-        if( ttyconfig&TTY_IECHO )
-            SerialWrite(chn,ch);
-        ptr[cnt] = ch;
-    }
-
-    return cnt;
-}
-
-/**
- *  @brief  tty_read_lb
- *  @note   line buffered
- *  @note   no timeout yet!!
- */
-int tty_read_lb(int chn, char *ptr, int len) {
-int cnt;
-int ch;
-
-    cnt = 0;
-    SerialFlush(chn);
-    while ( ((ch=SerialRead(chn)) != '\n') && (ch!='\r') ) {
-        if( ch == TTY_BS ) {
-            if( cnt > 0 ) {
-                cnt--;
-                SerialWrite(chn,'\b');
-                SerialWrite(chn,' ');
-                SerialWrite(chn,'\b');
-            }
-        } else {
-            if( ttyconfig&TTY_IECHO )
-                SerialWrite(chn,ch);
-            if( cnt < len )         // overflow characters not stored
-                ptr[cnt++] = ch;
-        }
-    }
-
-    if( cnt < len ) {
-        ptr[cnt++] = '\n';
-    }
-    if(ttyconfig&TTY_ICRLF ) {
-        SerialWrite(chn,'\r');
-        SerialWrite(chn,'\n');
-    }
-    return cnt;
-}
-
 /**
  * @brief   Library initialization
  *
  */
 
 void _main(void) {
-    SerialInit(0);
+    tty_init(0);
 }
 
 /**
@@ -337,9 +236,8 @@ int _open(const char *name, int flags, int mode) {
 
 int _read(int file, char *ptr, int len) {
 
-    if( ttyconfig & TTY_UNBUFF )
-        return tty_read_un(0,ptr,len);
-    return tty_read_lb(0,ptr,len);  // Default
+    return tty_read(0,ptr,len);
+
 }
 
 /**

@@ -11,19 +11,10 @@
  **
  **/
 
-/**
- ** @brief UART Configuration
- **
- ** @note No interrupts are used
- ** Oversampling    : 8
- ** Clock source    : SystemCoreClock
- ** Handshaking     : No
- **/
-
 
 #include "stm32l476xx.h"
 #include "system_stm32l476.h"
-#include "buffer.h"
+
 #include "uart.h"
 
 /**
@@ -36,24 +27,16 @@
 #define SETBITFIELD(VAR,MASK,VAL)   (VAR)=(((VAR)&~(MASK))|(VAL))
 //@}
 
-/// Buffer size for input and output
-#define INPUTBUFFERSIZE 100
-#define OUTPUTBUFFERSIZE 100
-/// Interrupt level
-#define RXINTLEVEL 6
-#define TXINTLEVEL 6
-
 /**
- * @brief   Global variables
- *
- * @note    To avoid use of malloc, it uses a macro to define area at compile time
- */
-
-DECLARE_BUFFER_AREA(inputbufferarea,INPUTBUFFERSIZE);
-DECLARE_BUFFER_AREA(outputbufferarea,OUTPUTBUFFERSIZE);
-buffer inputbuffer = 0;
-buffer outputbuffer = 0;
-
+ ** @brief Info and data area for UARTS
+ **/
+typedef struct {
+    USART_TypeDef  *device;
+    int             irqlevel;
+    int             irqn;
+    char            inbuffer;
+    char            outbuffer;
+} UART_Info;
 
 /**
  ** @brief List of known UARTs
@@ -61,44 +44,134 @@ buffer outputbuffer = 0;
  ** @note  Actually pointers to UARTs
  **/
 //@{
-static USART_TypeDef *uarttab[] = {
-    LPUART1,
-    USART1,
-    USART2,
-    USART3,
-    UART4,
-    UART5
+static UART_Info uarttab[] = {
+    { LPUART1,  6,  LPUART1_IRQn, 0, 0 },
+    { USART1,   6,  USART1_IRQn,  0, 0 },
+    { USART2,   6,  USART2_IRQn,  0, 0 },
+    { USART3,   6,  USART3_IRQn,  0, 0 },
+    { UART4,    6,  UART4_IRQn,   0, 0 },
+    { UART5,    6,  UART5_IRQn,   0, 0 }
 };
 static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
 //@}
 
+
 /**
- * Interrupt routine for USART2
- */
-void
-USART2_IRQHandler(void) {
+ ** @brief  Interrupt routines for USART, UART and LPUART
+ **/
+///@{
 
+/// IRQ Handler for LPUART1
+void LPUART1_IRQHandler(void) {
+USART_TypeDef  *uart = LPUART1;
 
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[0].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[0].outbuffer ) {
+            uart->TDR = uarttab[0].outbuffer;
+            uarttab[0].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
+
+/// IRQ Handler for USART1
+void USART1_IRQHandler(void) {
+USART_TypeDef  *uart = USART1;
+
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[1].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[1].outbuffer ) {
+            uart->TDR = uarttab[1].outbuffer;
+            uarttab[1].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+}
+
+/// IRQ Handler for USART2
+void USART2_IRQHandler(void) {
+USART_TypeDef  *uart = USART2;
+
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[2].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[2].outbuffer ) {
+            uart->TDR = uarttab[2].outbuffer;
+            uarttab[2].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+}
+
+/// IRQ Handler for USART3
+void USART3_IRQHandler(void) {
+USART_TypeDef  *uart = USART3;
+
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[3].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
+        if ( uarttab[3].outbuffer ) {
+            uart->TDR = uarttab[3].outbuffer;
+            uarttab[3].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+}
+
+/// IRQ Handler for UART4
+void UART4_IRQHandler(void) {
+USART_TypeDef  *uart = UART4;
+
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[4].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX  empty
+        if ( uarttab[4].outbuffer ) {
+            uart->TDR = uarttab[4].outbuffer;
+            uarttab[4].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+}
+
+/// IRQ Handler for UART5
+void UART5_IRQHandler(void) {
+USART_TypeDef  *uart = UART5;
+
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[5].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
+        if ( uarttab[5].outbuffer ) {
+            uart->TDR = uarttab[5].outbuffer;
+            uarttab[5].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+}
+///@}
+
 
 /**
  ** @brief UART Initialization
  **
  ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
  **/
-uint32_t
-UART_Init(USART_TypeDef *uart, uint32_t info) {
+int
+UART_Init(int uartn, unsigned info) {
 uint32_t baudrate,div,t,over;
-int uartn;
+USART_TypeDef * uart;
+
+    uart = uarttab[uartn].device;
 
     // Enable Clock
-    for(uartn=0;uartn<uarttabsize;uartn++) {
-        if( uarttab[uartn] == uart )
-            break;
-    }
-    if( uartn == uarttabsize )
-        return 1;
-
     if ( uartn == 0 ) {         // LPUART1
         RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
     } else if ( uartn == 1 ) {  // USART1
@@ -107,6 +180,7 @@ int uartn;
         RCC->APB1ENR1 |= BIT(uartn+17-2); // RCC_APB1ENR1_USARTxEN
     }
 
+    // Configuration of LPUART is after the last UART
     if( uartn == 0 ) uartn = uarttabsize;
 
     t = RCC->CCIPR&~BITVALUE(3,uartn*2-2);
@@ -155,50 +229,36 @@ int uartn;
 
     uart->BRR = (div&~0xF)|((div&0xF)>>1);
 
+    // enable interrupts (only TCIE and RX)
+
+    uart->CR1 |= USART_CR1_RXNEIE;      // Enable interrupt when RX not empty
+    uart->CR1 |= USART_CR1_TXEIE;       // Enable interrupt when TX is empty
+
+    // Enable interrupts on NVIC
+    NVIC_SetPriority(uarttab[uartn].irqn,uarttab[uartn].irqlevel);
+    NVIC_ClearPendingIRQ(uarttab[uartn].irqn);
+    NVIC_EnableIRQ(uarttab[uartn].irqn);
+
     // Enable UART
     uart->CR1 |= USART_CR1_UE;
-
-    // Enable buffers
-    inputbuffer  = buffer_init(inputbufferarea,INPUTBUFFERSIZE);
-    outputbuffer = buffer_init(outputbufferarea,OUTPUTBUFFERSIZE);
-
     return 0;
-}
-
-/**
- * @brief   Resets UART
- */
-
-void UART_Reset(USART_TypeDef *uart) {
-int uartn;
-
-    // Enable Clock
-    for(uartn=0;uartn<uarttabsize;uartn++) {
-        if( uarttab[uartn] == uart )
-            break;
-    }
-    if( uartn == uarttabsize )
-        return;
-
-    // Disable UART
-    uart->CR1 &= ~USART_CR1_UE;
-
-    buffer_deinit(inputbuffer);
-    buffer_deinit(outputbuffer);
-
 }
 
 /**
  ** @brief UART Send a character
  **
+ ** @note   It blocks until char is sent
  **/
-uint32_t
-UART_WriteChar(USART_TypeDef *uart, uint32_t c) {
+int
+UART_WriteChar(int uartn, unsigned c) {
+USART_TypeDef *uart;
 
-
-    while( (uart->ISR&USART_ISR_TEACK)==0 ) {}
+    // wait until buffer free
+    while ( uarttab[uartn].outbuffer != 0 ) {}
+    // send it
     uart->TDR = c;
-    return 0;
+
+    return 1;
 }
 
 /**
@@ -207,53 +267,84 @@ UART_WriteChar(USART_TypeDef *uart, uint32_t c) {
  ** @note  It uses UART_WriteChar
  **
  **/
-uint32_t
-UART_WriteString(USART_TypeDef *uart, char s[]) {
+int
+UART_WriteString(int uartn, char s[]) {
 
     while(*s) {
-        UART_WriteChar(uart,*s++);
+        UART_WriteChar(uartn,*s++);
     }
     return 0;
 }
 
 /**
- ** @brief UART Read a char
+ ** @brief Read a character from UART
  **
- ** @note  It uses UART_WriteChar
+ ** @note  It blocks until a character is entered
  **
  **/
-uint32_t
-UART_ReadChar(USART_TypeDef *uart) {
+int
+UART_ReadChar(int uartn) {
+USART_TypeDef *uart;
+
+    while( uarttab[uartn].inbuffer == 0 ) {}
+
+    return uarttab[uartn].inbuffer;
+
+}
 
 
-    return 0;
+/**
+ ** @brief UART Send a string
+ **
+ ** @note  It block until "n" characters are entered or
+ **        a newline is entered
+ **
+ ** @note  It uses UART_ReadChar
+ **
+ **/
+int
+UART_ReadString(int uartn, char *s, int n) {
+int i;
+
+    for(i=0;i<n-1;i++) {
+        s[i] = UART_ReadChar(uartn);
+        if( s[i] == '\n' || s[i] == '\r' )
+            break;
+    }
+    s[i] = '\0';
+    return i;
 }
 
 /**
- * @brief   Flush buffer
- *
- * @note    Does block!!!!!
- */
+ ** @brief UART Get Status
+ **
+ ** @note  Return status
+ **
+ **/
+int
+UART_GetStatus(int uartn) {
+USART_TypeDef *uart;
 
-int UART_Flush(USART_TypeDef *uart) {
-int cnt;
-int ch;
+    uart = uarttab[uartn].device;
 
-    // Clear input buffer
-    buffer_clear(inputbuffer);
+    return uart->ISR;
 
-    // Clear output buffer
-    cnt = 0;
-    // Disable interrupts
-    //UART0->IEN &= ~(UART_IEN_TXC|UART_IEN_RXDATAV);
-    while( ! buffer_empty(outputbuffer) ) {
-        // Wait until UART TX is free
-        ch = buffer_remove(outputbuffer);
-//        UART_PutCharPolling(ch);
-        cnt++;
-    }
-    // Reenable interrupts
-    //UART0->IEN |= UART_IEN_TXC|UART_IEN_RXDATAV;
-    return cnt;
+}
+
+/**
+ ** @brief UART Flush buffers
+ **
+ **/
+int
+UART_Flush(int uartn) {
+USART_TypeDef *uart;
+
+    uart = uarttab[uartn].device;
+
+    uarttab[uartn].inbuffer  = 0;
+    uarttab[uartn].outbuffer = 0;
+
+    return 0;
+
 }
 

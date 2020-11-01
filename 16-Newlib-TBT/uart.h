@@ -1,5 +1,5 @@
 #ifndef UART_H
-#define USART_H
+#define UART_H
 /**
  * @file     uart.h
  * @brief    Hardware Abstraction Layer (HAL) for UARTs
@@ -13,15 +13,10 @@
  *
  ******************************************************************************/
 
-/**
- * @brief LED Symbols
- *
- * @note Green LED is on GPIO Port E
- * @note Red LED is on GPIO Port B
- *
- * @note BIT rename LED_BIT to avoid name collision
- */
-//@{
+#ifndef UART_BIT
+#define UART_BIT(N) (1U<<(N))
+#define UART_BITFIELD(V,P)   ((V)<<(P))
+#endif
 
 /**
  ** @brief  Parameters to configure UART
@@ -46,39 +41,61 @@
 #define UART_OVER8          0x80
 #define UART_OVER16         0x00
 
-#define UARTBITVALUE(V,P)   ((V)<<(P))
+
 #define UART_BAUD           0xFFFFF00
-#define UART_BAUD_150       UARTBITVALUE(150,8)
-#define UART_BAUD_300       UARTBITVALUE(300,8)
-#define UART_BAUD_600       UARTBITVALUE(600,8)
-#define UART_BAUD_1200      UARTBITVALUE(1200,8)
-#define UART_BAUD_2400      UARTBITVALUE(2400,8)
-#define UART_BAUD_4800      UARTBITVALUE(4800,8)
-#define UART_BAUD_9600      UARTBITVALUE(9600,8)
-#define UART_BAUD_19200     UARTBITVALUE(19200,8)
-#define UART_BAUD_38400     UARTBITVALUE(38400,8)
-#define UART_BAUD_57600     UARTBITVALUE(57600,8)
-#define UART_BAUD_115200    UARTBITVALUE(115200,8)
+#define UART_BAUD_150       UART_BITFIELD(150,8)
+#define UART_BAUD_300       UART_BITFIELD(300,8)
+#define UART_BAUD_600       UART_BITFIELD(600,8)
+#define UART_BAUD_1200      UART_BITFIELD(1200,8)
+#define UART_BAUD_2400      UART_BITFIELD(2400,8)
+#define UART_BAUD_4800      UART_BITFIELD(4800,8)
+#define UART_BAUD_9600      UART_BITFIELD(9600,8)
+#define UART_BAUD_19200     UART_BITFIELD(19200,8)
+#define UART_BAUD_38400     UART_BITFIELD(38400,8)
+#define UART_BAUD_57600     UART_BITFIELD(57600,8)
+#define UART_BAUD_115200    UART_BITFIELD(115200,8)
 //@}
 
 /**
- ** @brief Alias for USARTs
- **/
+ * @brief Id for USART/USARTs
+ *
+ *   Device     |   Id
+ *   -----------|-----------------
+ *   LPUART1    |   UART_0 or UART_LP
+ *   USART1     |   UART_1
+ *   USART2     |   UART_2
+ *   USART3     |   UART_3
+ *   UART4      |   UART_4
+ *   UART5      |   UART_5
+ */
 //@{
-#define UART1   USART1
-#define UART2   USART2
-#define UART3   USART3
+#define UART_0   0
+#define UART_LP  0
+#define UART_1   1
+#define UART_2   2
+#define UART_3   3
+#define UART_4   4
+#define UART_5   5
 //@}
 
-uint32_t UART_Init(USART_TypeDef *uart, uint32_t info);
-void     UART_Reset(USART_TypeDef *uart);
-uint32_t UART_WriteChar(USART_TypeDef *uart, uint32_t c);
-uint32_t UART_WriteString(USART_TypeDef *uart, char s[]);
-uint32_t UART_ReadChar(USART_TypeDef *uart);
-uint32_t UART_GetStatus(USART_TypeDef *uart);
-int      UART_Flush(USART_TypeDef *uart);
+/// Symbols returned by GetStatus
+//@{
+#define UART_TXCOMPLETE UART_BIT(6)
+#define UART_RXNOTEMPTY UART_BIT(5)
+#define UART_TXEMPTY    UART_BIT(7)
+#define UART_RXBUSY     UART_BIT(16)
+#define UART_RXFERROR   UART_BIT(1)
+#define UART_RXPERROR   UART_BIT(0)
+///@}
 
+int UART_Init(int uartn, unsigned info);
+int UART_WriteChar(int uartn, unsigned c);
+int UART_WriteString(int uartn, char s[]);
 
+int UART_ReadChar(int uartn);
+int UART_ReadString(int uartn, char *s, int n);
+int UART_GetStatus(int uartn);
 
+int UART_Flush(int uartn);
 
 #endif // UART_H

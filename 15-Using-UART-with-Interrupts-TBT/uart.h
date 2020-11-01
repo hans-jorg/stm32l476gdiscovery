@@ -88,12 +88,14 @@
 #define UART_RXPERROR   UART_BIT(0)
 ///@}
 
-int UART_Init(int uartn, uint32_t info);
-int UART_WriteChar(int uartn, uint32_t c);
+int UART_Init(int uartn, unsigned info);
+int UART_WriteChar(int uartn, unsigned c);
 int UART_WriteString(int uartn, char s[]);
 
 int UART_ReadChar(int uartn);
 int UART_ReadString(int uartn, char *s, int n);
 int UART_GetStatus(int uartn);
+
+int UART_Flush(int uartn);
 
 #endif // UART_H
