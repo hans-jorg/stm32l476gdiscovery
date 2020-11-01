@@ -1,11 +1,11 @@
 /**
  * @file    buffer.c
  *
- * @note    FIFO buffer for chars
- * @note    Uses a global data defined by DECLARE_BUFFER_AREA macro
+ * @note    FIFO buffer_t  for chars
+ * @note    Uses a static data defined by DECLARE_BUFFER_AREA macro
  * @note    It does not use malloc
  * @note    Size must be defined in DECLARE_BUFFER_AREA and in buffer_init (Ugly)
- * @note    Uses as many dependencies as possible
+ * @note    Uses as less dependencies as possible
  */
 
 #include "buffer.h"
@@ -13,11 +13,14 @@
 
 /**
  * @brief   initializes a fifo area
+ *
+ * @note    it actually returns a pointer to the same address as
+ *          the one passed as parameter
  */
 
-buffer
+buffer_t
 buffer_init(void *b, int n) {
-buffer f = (buffer) b;
+buffer_t  f = (buffer_t) b;
 
     f->front = f->rear = f->data;
     f->size = 0;
@@ -28,12 +31,12 @@ buffer f = (buffer) b;
 /**
  * @brief   Clears fifo
  *
- * @note    Does not free any area, because it is static
-            In future, it will free area
+ * @note    Does not free any area, because the area is static
+ *          This can change in the future
  */
 
 void
-buffer_deinit(buffer f) {
+buffer_deinit(buffer_t  f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -46,7 +49,7 @@ buffer_deinit(buffer f) {
  * @note    Does not free area. For now identical to deinit
  */
  void
- buffer_clear(buffer f) {
+ buffer_clear(buffer_t  f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -60,7 +63,7 @@ buffer_deinit(buffer f) {
  */
 
 int
-buffer_insert(buffer f, char x) {
+buffer_insert(buffer_t  f, char x) {
 
     if( buffer_full(f) )
         return -1;
@@ -79,7 +82,7 @@ buffer_insert(buffer f, char x) {
  */
 
 int
-buffer_remove(buffer f) {
+buffer_remove(buffer_t  f) {
 char ch;
 
     if( buffer_empty(f) )

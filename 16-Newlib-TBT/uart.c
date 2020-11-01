@@ -2,8 +2,8 @@
 /**
  ** @file     uart.h
  ** @brief    Hardware Abstraction Layer (HAL) for UART
- ** @version  V1.0
- ** @date     23/01/2016
+ ** @version  V1.1
+ ** @date     01/11/2020
  **
  ** @note     Direct access to registers
  ** @note     No library except CMSIS is used
@@ -16,6 +16,7 @@
 #include "system_stm32l476.h"
 
 #include "uart.h"
+#include "buffer.h"
 
 /**
  ** @brief Bit manipulation macros
@@ -28,14 +29,38 @@
 //@}
 
 /**
+ * @brief   Define buffer for USART2
+ */
+///@{
+#define BUFFERSIZE2     50
+BUFFER_DEFINE_AREA(inarea2,BUFFERSIZE2);
+BUFFER_DEFINE_AREA(outarea2,BUFFERSIZE2);
+///@{
+
+/// Define Interrupt level for USARTx, UARTx, LPUSARTx
+#define INT_LEVEL           6
+
+
+
+/**
  ** @brief Info and data area for UARTS
  **/
 typedef struct {
     USART_TypeDef  *device;
-    int             irqlevel;
-    int             irqn;
-    char            inbuffer;
-    char            outbuffer;
+    struct {
+        unsigned    irqlevel:8;         // interrupt level
+        unsigned    irqn:8;             // interrupt number
+        unsigned    buffered:1;         // use circular buffer when 1, else use a byte
+        unsigned    size:10;            // maximal 1023
+    } info;
+    union {
+        char            byte;
+        buffer_t        buffer;
+    } in;
+    union {
+        char            byte;
+        buffer_t        buffer;
+    } out;
 } UART_Info;
 
 /**
@@ -45,16 +70,84 @@ typedef struct {
  **/
 //@{
 static UART_Info uarttab[] = {
-    { LPUART1,  6,  LPUART1_IRQn, 0, 0 },
-    { USART1,   6,  USART1_IRQn,  0, 0 },
-    { USART2,   6,  USART2_IRQn,  0, 0 },
-    { USART3,   6,  USART3_IRQn,  0, 0 },
-    { UART4,    6,  UART4_IRQn,   0, 0 },
-    { UART5,    6,  UART5_IRQn,   0, 0 }
+    { LPUART1,  { INT_LEVEL,  LPUART1_IRQn, 0  },
+                { 0 },
+                { 0 }
+    },
+    { USART1,   { INT_LEVEL,  USART1_IRQn,  0  },
+                { 0 },
+                { 0 }
+    },
+    { USART2,   { INT_LEVEL,  USART2_IRQn,  1, BUFFERSIZE2 },
+                { .buffer = (buffer_t) inarea2 },
+                { .buffer = (buffer_t) outarea2}
+    },
+    { USART3,   { INT_LEVEL,  USART3_IRQn,  0  },
+                { 0 },
+                { 0 }
+    },
+    { UART4,    { INT_LEVEL,  UART4_IRQn,   0  },
+                { 0 },
+                { 0 }
+    },
+    { UART5,    { INT_LEVEL,  UART5_IRQn,   0  },
+                { 0 },
+                { 0 }
+    }
 };
-static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
+static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
 //@}
 
+/**
+ * @brief   Macros to simplify coding of the interrupt routines
+ *
+ * @note    The processing of UART interrupts are identical except for
+ *          the pointer to USART_TypeDef structure and the index in the
+ *          uarttab
+ *
+ * @note    They use the old hack of do { ;; } while(0) to avoid problems
+ *          when they are used on then clauses.
+ *          There is now ; after } in the then clause. It generates an error
+ */
+
+#define PROCESS_INTERRUPT_UNBUFFERED(UART,UARTN)                            \
+    do {                                                                    \
+        if( (UART)->ISR & USART_ISR_RXNE  ) {                               \
+            uarttab[(UARTN)].in.byte = (UART)->RDR;                         \
+        }                                                                   \
+        if( (UART)->ISR & USART_ISR_TXE  ) {                                \
+            if ( uarttab[UARTN].out.byte ) {                                \
+                (UART)->TDR = uarttab[UARTN].out.byte;                      \
+                uarttab[UARTN].out.byte = 0;                                \
+            }                                                               \
+        }                                                                   \
+        /* Clear all pending interrupts */                                  \
+        (UART)->ICR = 0x00121BDF;                                           \
+    } while(0)
+
+#define PROCESS_INTERRUPT_BUFFERED(UART,UARTN)                              \
+    do {                                                                    \
+        if( (UART)->ISR & USART_ISR_RXNE  ) {                               \
+            buffer_insert(uarttab[(UARTN)].in.buffer,(UART)->RDR);          \
+        }                                                                   \
+        if( (UART)->ISR & USART_ISR_TXE  ) {                                \
+            if ( uarttab[UARTN].out.byte ) {                                \
+                (UART)->TDR = uarttab[UARTN].out.byte;                      \
+                uarttab[UARTN].out.byte = 0;                                \
+            }                                                               \
+        }                                                                   \
+    } while(0)
+
+#define PROCESS_INTERRUPT(UART,UARTN)                                       \
+    do {                                                                    \
+        if( uarttab[(UARTN)].info.buffered ) {                              \
+            PROCESS_INTERRUPT_BUFFERED(LPUART1,0);                          \
+        } else {                                                            \
+            PROCESS_INTERRUPT_UNBUFFERED(LPUART1,0);                        \
+        }                                                                   \
+        /* Clear all pending interrupts */                                  \
+        (UART)->ICR = 0x00121BDF;                                           \
+    } while(0)
 
 /**
  ** @brief  Interrupt routines for USART, UART and LPUART
@@ -63,98 +156,43 @@ static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
 
 /// IRQ Handler for LPUART1
 void LPUART1_IRQHandler(void) {
-USART_TypeDef  *uart = LPUART1;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(LPUART1,0);
 }
 
 /// IRQ Handler for USART1
 void USART1_IRQHandler(void) {
-USART_TypeDef  *uart = USART1;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[1].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
-        if ( uarttab[1].outbuffer ) {
-            uart->TDR = uarttab[1].outbuffer;
-            uarttab[1].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(USART1,1);
+
 }
 
 /// IRQ Handler for USART2
 void USART2_IRQHandler(void) {
-USART_TypeDef  *uart = USART2;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[2].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
-        if ( uarttab[2].outbuffer ) {
-            uart->TDR = uarttab[2].outbuffer;
-            uarttab[2].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(USART2,2);
+
 }
 
 /// IRQ Handler for USART3
 void USART3_IRQHandler(void) {
-USART_TypeDef  *uart = USART3;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[3].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[3].outbuffer ) {
-            uart->TDR = uarttab[3].outbuffer;
-            uarttab[3].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(USART3,3);
+
 }
 
 /// IRQ Handler for UART4
 void UART4_IRQHandler(void) {
-USART_TypeDef  *uart = UART4;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[4].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX  empty
-        if ( uarttab[4].outbuffer ) {
-            uart->TDR = uarttab[4].outbuffer;
-            uarttab[4].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(UART4,4);
+
 }
 
 /// IRQ Handler for UART5
 void UART5_IRQHandler(void) {
-USART_TypeDef  *uart = UART5;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[5].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[5].outbuffer ) {
-            uart->TDR = uarttab[5].outbuffer;
-            uarttab[5].outbuffer = 0;
-        }
-    }
-    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
+    PROCESS_INTERRUPT(UART5,5);
+
 }
 ///@}
 
@@ -235,10 +273,18 @@ USART_TypeDef * uart;
     uart->CR1 |= USART_CR1_TXEIE;       // Enable interrupt when TX is empty
 
     // Enable interrupts on NVIC
-    NVIC_SetPriority(uarttab[uartn].irqn,uarttab[uartn].irqlevel);
-    NVIC_ClearPendingIRQ(uarttab[uartn].irqn);
-    NVIC_EnableIRQ(uarttab[uartn].irqn);
+    NVIC_SetPriority(uarttab[uartn].info.irqn,uarttab[uartn].info.irqlevel);
+    NVIC_ClearPendingIRQ(uarttab[uartn].info.irqn);
+    NVIC_EnableIRQ(uarttab[uartn].info.irqn);
 
+    if( uarttab[uartn].info.buffered ) {
+        uarttab[uartn].in.buffer  = buffer_init(
+                                uarttab[uartn].in.buffer,
+                                uarttab[uartn].info.size);
+        uarttab[uartn].out.buffer = buffer_init(
+                                uarttab[uartn].out.buffer,
+                                uarttab[uartn].info.size);
+    }
     // Enable UART
     uart->CR1 |= USART_CR1_UE;
     return 0;
@@ -254,7 +300,7 @@ UART_WriteChar(int uartn, unsigned c) {
 USART_TypeDef *uart;
 
     // wait until buffer free
-    while ( uarttab[uartn].outbuffer != 0 ) {}
+    while ( uarttab[uartn].out.byte != 0 ) {}
     // send it
     uart->TDR = c;
 
@@ -286,9 +332,9 @@ int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
 
-    while( uarttab[uartn].inbuffer == 0 ) {}
+    while( uarttab[uartn].in.byte == 0 ) {}
 
-    return uarttab[uartn].inbuffer;
+    return uarttab[uartn].in.byte;
 
 }
 
@@ -341,8 +387,8 @@ USART_TypeDef *uart;
 
     uart = uarttab[uartn].device;
 
-    uarttab[uartn].inbuffer  = 0;
-    uarttab[uartn].outbuffer = 0;
+    uarttab[uartn].in.byte  = 0;
+    uarttab[uartn].out.byte = 0;
 
     return 0;
 
