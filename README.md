@@ -36,7 +36,21 @@ The board can be powered by one of the following
 * External 5 V
 * CR2032 battery
 
+### Energy supply
 
+### Serial interface
+
+There are two serial interface that can be used during debugging.]
+
+* There is a serial connection between target MCU STM32L476 and the host MCU (a STM32F103CBT6).
+* There is a virtual serial connection, that shares the debug connections.
+
+The serial connection
+
+Signal      | Connector |  Jumper   |   Pin     |  AF  |  Device       |
+------------|-----------|-----------|-----------|------|---------------|
+USART RX    |  JP4 RX   |  SB16     |   PD6     |  7   |   USART2      |   
+USART TX    |  JP4 TX   |  SB13     |   PD5     |  7   |   USART2      |
  
 ## A Step-By-Step Introduction to Software Development for the STM32L476G Discovery Board
  

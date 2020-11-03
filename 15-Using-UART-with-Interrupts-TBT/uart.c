@@ -1,4 +1,3 @@
-
 /**
  ** @file     uart.h
  ** @brief    Hardware Abstraction Layer (HAL) for UART
@@ -27,15 +26,27 @@
 #define SETBITFIELD(VAR,MASK,VAL)   (VAR)=(((VAR)&~(MASK))|(VAL))
 //@}
 
+
+/**
+ * @brief   Pin configuration
+ */
+typedef struct {
+    GPIO_TypeDef   *gpio;
+    int             pin;
+    int             af;
+} PinConfiguration;
+
 /**
  ** @brief Info and data area for UARTS
  **/
 typedef struct {
-    USART_TypeDef  *device;
-    int             irqlevel;
-    int             irqn;
-    char            inbuffer;
-    char            outbuffer;
+    USART_TypeDef      *device;
+    int                 irqlevel;
+    int                 irqn;
+    char                inbuffer;
+    char                outbuffer;
+    PinConfiguration    txpinconf;
+    PinConfiguration    rxpinconf;
 } UART_Info;
 
 /**
@@ -45,17 +56,55 @@ typedef struct {
  **/
 //@{
 static UART_Info uarttab[] = {
-    { LPUART1,  6,  LPUART1_IRQn, 0, 0 },
-    { USART1,   6,  USART1_IRQn,  0, 0 },
-    { USART2,   6,  USART2_IRQn,  0, 0 },
-    { USART3,   6,  USART3_IRQn,  0, 0 },
-    { UART4,    6,  UART4_IRQn,   0, 0 },
-    { UART5,    6,  UART5_IRQn,   0, 0 }
+    /* Device  IRQ    IRQn       Buffer     txconfig        rxconfig   */
+    /*        level                       Port  Pin AF    Port  Pin AF */
+    { LPUART1,  6,  LPUART1_IRQn, 0, 0, { GPIOB,11, 8 },{ GPIOB,10, 8 } },
+    { USART1,   6,  USART1_IRQn,  0, 0, { GPIOG, 9, 7 },{ GPIOG,10, 7 } },
+    { USART2,   6,  USART2_IRQn,  0, 0, { GPIOD, 5, 7 },{ GPIOD, 6, 7 } },
+    { USART3,   6,  USART3_IRQn,  0, 0, { GPIOD, 8, 7 },{ GPIOD, 9, 7 } },
+    { UART4,    6,  UART4_IRQn,   0, 0, { GPIOA, 0, 8 },{ GPIOD, 1, 8 } },
+    { UART5,    6,  UART5_IRQn,   0, 0, { GPIOC,12, 8 },{ GPIOD, 2, 8 } }
 };
 static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
 //@}
 
+/**
+ * @brief   Configure Pin
+ */
+static void ConfigurePin(PinConfiguration *conf) {
+GPIO_TypeDef *gpio;
+int pos;
 
+    gpio = conf->gpio;
+
+    if( gpio == GPIOA ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
+    } else if ( gpio == GPIOB ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    } else if ( gpio == GPIOC ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;
+    } else if ( gpio == GPIOD ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIODEN;
+    } else if ( gpio == GPIOE ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
+    } else if ( gpio == GPIOF ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOFEN;
+    } else if ( gpio == GPIOG ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOGEN;
+    } else if ( gpio == GPIOH ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOHEN;
+    } else {
+        return;
+    }
+
+    if( conf->pin > 7 ) {
+        pos = (conf->pin - 7)*4;
+        gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos))|(conf->af<<pos);
+    } else {
+        pos = (conf->pin)*4;
+        gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos))|(conf->af<<pos);
+    }
+}
 /**
  ** @brief  Interrupt routines for USART, UART and LPUART
  **/
@@ -170,6 +219,10 @@ uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 
     uart = uarttab[uartn].device;
+
+    // Configure pin
+    ConfigurePin(&uarttab[uartn].txpinconf);
+    ConfigurePin(&uarttab[uartn].rxpinconf);
 
     // Enable Clock
     if ( uartn == 0 ) {         // LPUART1
