@@ -117,6 +117,28 @@ int pos;
         gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos))|(conf->af<<pos);
     }
 }
+
+
+/**
+ * @brief   Enable UART
+ */
+void UART_Enable(USART_TypeDef *uart) {
+
+    if ( uart == LPUART1 ) {
+        RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
+    } else if ( uart == USART1 ) {
+        RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+    } else if ( uart == USART2 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_USART2EN;
+    } else if ( uart == USART3 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_USART3EN;
+    } else if ( uart == UART4 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_UART4EN;
+    } else if ( uart == UART5 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_UART5EN;
+    }
+}
+
 /**
  ** @brief  Interrupt routines for USART, UART and LPUART
  **/
@@ -236,23 +258,18 @@ USART_TypeDef * uart;
     ConfigurePin(&uarttab[uartn].txpinconf);
     ConfigurePin(&uarttab[uartn].rxpinconf);
 
-    // Enable Clock
-    if ( uartn == 0 ) {         // LPUART1
-        RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
-    } else if ( uartn == 1 ) {  // USART1
-        RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
-    } else {                      // USART2..5
-        RCC->APB1ENR1 |= BIT(uartn+17-2); // RCC_APB1ENR1_USARTxEN
-    }
-
     // Configuration of LPUART is after the last UART
     if( uartn == 0 ) uartn = uarttabsize;
 
+    // Select clock source
     t = RCC->CCIPR&~BITVALUE(3,uartn*2-2);
     t |= BITVALUE(1,uartn*2-2); // SYSCLK as Clock Source
     RCC->CCIPR = t;
 
-    // Configure
+    // Enable Clock
+    UART_Enable(uart);
+
+    // Configure UART
     t = uart->CR1;
     t &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
     switch( info&UART_SIZE ) {

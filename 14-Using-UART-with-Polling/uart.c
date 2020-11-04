@@ -63,14 +63,14 @@ typedef struct {
 static UART_Info uarttab[] = {
     /* Device        txconfig        rxconfig    */
     /*              Port  Pin AF    Port  Pin AF */
-    { LPUART1,   { GPIOB,11, 8 },{ GPIOB,10, 8 } },
+    { LPUART1,   { GPIOC, 1, 8 },{ GPIOC, 0, 8 } },
     { USART1,    { GPIOG, 9, 7 },{ GPIOG,10, 7 } },
     { USART2,    { GPIOD, 5, 7 },{ GPIOD, 6, 7 } },
     { USART3,    { GPIOD, 8, 7 },{ GPIOD, 9, 7 } },
-    { UART4,     { GPIOA, 0, 8 },{ GPIOD, 1, 8 } },
+    { UART4,     { GPIOA, 0, 8 },{ GPIOA, 1, 8 } },
     { UART5,     { GPIOC,12, 8 },{ GPIOD, 2, 8 } }
 };
-static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info *);
+static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
 //@}
 
 /**
