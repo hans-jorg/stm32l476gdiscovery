@@ -65,17 +65,16 @@ static UART_Info uarttab[] = {
     { UART4,    6,  UART4_IRQn,   0, 0, { GPIOA, 0, 8 },{ GPIOD, 1, 8 } },
     { UART5,    6,  UART5_IRQn,   0, 0, { GPIOC,12, 8 },{ GPIOD, 2, 8 } }
 };
-static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
+static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
 //@}
 
 /**
- * @brief   Configure Pin
+ * @brief   Enable GPIO
+ *
+ * @note    Should be in gpio.[ch]
+ *
  */
-static void ConfigurePin(PinConfiguration *conf) {
-GPIO_TypeDef *gpio;
-int pos;
-
-    gpio = conf->gpio;
+void GPIO_Enable(GPIO_TypeDef *gpio) {
 
     if( gpio == GPIOA ) {
         RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
@@ -96,6 +95,19 @@ int pos;
     } else {
         return;
     }
+}
+
+/**
+ * @brief   Configure Pin
+ */
+static void ConfigurePin(PinConfiguration *conf) {
+GPIO_TypeDef *gpio;
+int pos;
+
+    gpio = conf->gpio;
+
+    // Enable clock for GPIOx, if it is not already enabled
+    GPIO_Enable(gpio);
 
     if( conf->pin > 7 ) {
         pos = (conf->pin - 7)*4;

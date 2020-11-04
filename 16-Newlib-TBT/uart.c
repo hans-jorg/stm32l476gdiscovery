@@ -1,9 +1,8 @@
-
 /**
  ** @file     uart.h
  ** @brief    Hardware Abstraction Layer (HAL) for UART
- ** @version  V1.1
- ** @date     01/11/2020
+ ** @version  V1.0
+ ** @date     23/01/2016
  **
  ** @note     Direct access to registers
  ** @note     No library except CMSIS is used
@@ -16,7 +15,6 @@
 #include "system_stm32l476.h"
 
 #include "uart.h"
-#include "buffer.h"
 
 /**
  ** @brief Bit manipulation macros
@@ -28,39 +26,27 @@
 #define SETBITFIELD(VAR,MASK,VAL)   (VAR)=(((VAR)&~(MASK))|(VAL))
 //@}
 
+
 /**
- * @brief   Define buffer for USART2
+ * @brief   Pin configuration
  */
-///@{
-#define BUFFERSIZE2     50
-BUFFER_DEFINE_AREA(inarea2,BUFFERSIZE2);
-BUFFER_DEFINE_AREA(outarea2,BUFFERSIZE2);
-///@{
-
-/// Define Interrupt level for USARTx, UARTx, LPUSARTx
-#define INT_LEVEL           6
-
-
+typedef struct {
+    GPIO_TypeDef   *gpio;
+    int             pin;
+    int             af;
+} PinConfiguration;
 
 /**
  ** @brief Info and data area for UARTS
  **/
 typedef struct {
-    USART_TypeDef  *device;
-    struct {
-        unsigned    irqlevel:8;         // interrupt level
-        unsigned    irqn:8;             // interrupt number
-        unsigned    buffered:1;         // use circular buffer when 1, else use a byte
-        unsigned    size:10;            // maximal 1023
-    } info;
-    union {
-        char            byte;
-        buffer_t        buffer;
-    } in;
-    union {
-        char            byte;
-        buffer_t        buffer;
-    } out;
+    USART_TypeDef      *device;
+    int                 irqlevel;
+    int                 irqn;
+    char                inbuffer;
+    char                outbuffer;
+    PinConfiguration    txpinconf;
+    PinConfiguration    rxpinconf;
 } UART_Info;
 
 /**
@@ -70,85 +56,67 @@ typedef struct {
  **/
 //@{
 static UART_Info uarttab[] = {
-    { LPUART1,  { INT_LEVEL,  LPUART1_IRQn, 0  },
-                { 0 },
-                { 0 }
-    },
-    { USART1,   { INT_LEVEL,  USART1_IRQn,  0  },
-                { 0 },
-                { 0 }
-    },
-    { USART2,   { INT_LEVEL,  USART2_IRQn,  1, BUFFERSIZE2 },
-                { .buffer = (buffer_t) inarea2 },
-                { .buffer = (buffer_t) outarea2}
-    },
-    { USART3,   { INT_LEVEL,  USART3_IRQn,  0  },
-                { 0 },
-                { 0 }
-    },
-    { UART4,    { INT_LEVEL,  UART4_IRQn,   0  },
-                { 0 },
-                { 0 }
-    },
-    { UART5,    { INT_LEVEL,  UART5_IRQn,   0  },
-                { 0 },
-                { 0 }
-    }
+    /* Device  IRQ    IRQn       Buffer     txconfig        rxconfig   */
+    /*        level                       Port  Pin AF    Port  Pin AF */
+    { LPUART1,  6,  LPUART1_IRQn, 0, 0, { GPIOB,11, 8 },{ GPIOB,10, 8 } },
+    { USART1,   6,  USART1_IRQn,  0, 0, { GPIOG, 9, 7 },{ GPIOG,10, 7 } },
+    { USART2,   6,  USART2_IRQn,  0, 0, { GPIOD, 5, 7 },{ GPIOD, 6, 7 } },
+    { USART3,   6,  USART3_IRQn,  0, 0, { GPIOD, 8, 7 },{ GPIOD, 9, 7 } },
+    { UART4,    6,  UART4_IRQn,   0, 0, { GPIOA, 0, 8 },{ GPIOD, 1, 8 } },
+    { UART5,    6,  UART5_IRQn,   0, 0, { GPIOC,12, 8 },{ GPIOD, 2, 8 } }
 };
 static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
 //@}
 
 /**
- * @brief   Macros to simplify coding of the interrupt routines
+ * @brief   Enable GPIO
  *
- * @note    The processing of UART interrupts are identical except for
- *          the pointer to USART_TypeDef structure and the index in the
- *          uarttab
+ * @note    Should be in gpio.[ch]
  *
- * @note    They use the old hack of do { ;; } while(0) to avoid problems
- *          when they are used on then clauses.
- *          There is now ; after } in the then clause. It generates an error
  */
+void GPIO_Enable(GPIO_TypeDef *gpio) {
 
-#define PROCESS_INTERRUPT_UNBUFFERED(UART,UARTN)                            \
-    do {                                                                    \
-        if( (UART)->ISR & USART_ISR_RXNE  ) {                               \
-            uarttab[(UARTN)].in.byte = (UART)->RDR;                         \
-        }                                                                   \
-        if( (UART)->ISR & USART_ISR_TXE  ) {                                \
-            if ( uarttab[UARTN].out.byte ) {                                \
-                (UART)->TDR = uarttab[UARTN].out.byte;                      \
-                uarttab[UARTN].out.byte = 0;                                \
-            }                                                               \
-        }                                                                   \
-        /* Clear all pending interrupts */                                  \
-        (UART)->ICR = 0x00121BDF;                                           \
-    } while(0)
+    if( gpio == GPIOA ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
+    } else if ( gpio == GPIOB ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    } else if ( gpio == GPIOC ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;
+    } else if ( gpio == GPIOD ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIODEN;
+    } else if ( gpio == GPIOE ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
+    } else if ( gpio == GPIOF ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOFEN;
+    } else if ( gpio == GPIOG ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOGEN;
+    } else if ( gpio == GPIOH ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOHEN;
+    } else {
+        return;
+    }
+}
 
-#define PROCESS_INTERRUPT_BUFFERED(UART,UARTN)                              \
-    do {                                                                    \
-        if( (UART)->ISR & USART_ISR_RXNE  ) {                               \
-            buffer_insert(uarttab[(UARTN)].in.buffer,(UART)->RDR);          \
-        }                                                                   \
-        if( (UART)->ISR & USART_ISR_TXE  ) {                                \
-            if ( uarttab[UARTN].out.byte ) {                                \
-                (UART)->TDR = uarttab[UARTN].out.byte;                      \
-                uarttab[UARTN].out.byte = 0;                                \
-            }                                                               \
-        }                                                                   \
-    } while(0)
+/**
+ * @brief   Configure Pin
+ */
+static void ConfigurePin(PinConfiguration *conf) {
+GPIO_TypeDef *gpio;
+int pos;
 
-#define PROCESS_INTERRUPT(UART,UARTN)                                       \
-    do {                                                                    \
-        if( uarttab[(UARTN)].info.buffered ) {                              \
-            PROCESS_INTERRUPT_BUFFERED(LPUART1,0);                          \
-        } else {                                                            \
-            PROCESS_INTERRUPT_UNBUFFERED(LPUART1,0);                        \
-        }                                                                   \
-        /* Clear all pending interrupts */                                  \
-        (UART)->ICR = 0x00121BDF;                                           \
-    } while(0)
+    gpio = conf->gpio;
 
+    // Enable clock for GPIOx, if it is not already enabled
+    GPIO_Enable(gpio);
+
+    if( conf->pin > 7 ) {
+        pos = (conf->pin - 7)*4;
+        gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos))|(conf->af<<pos);
+    } else {
+        pos = (conf->pin)*4;
+        gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos))|(conf->af<<pos);
+    }
+}
 /**
  ** @brief  Interrupt routines for USART, UART and LPUART
  **/
@@ -156,43 +124,98 @@ static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
 
 /// IRQ Handler for LPUART1
 void LPUART1_IRQHandler(void) {
+USART_TypeDef  *uart = LPUART1;
 
-    PROCESS_INTERRUPT(LPUART1,0);
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[0].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[0].outbuffer ) {
+            uart->TDR = uarttab[0].outbuffer;
+            uarttab[0].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 
 /// IRQ Handler for USART1
 void USART1_IRQHandler(void) {
+USART_TypeDef  *uart = USART1;
 
-    PROCESS_INTERRUPT(USART1,1);
-
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[1].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[1].outbuffer ) {
+            uart->TDR = uarttab[1].outbuffer;
+            uarttab[1].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 
 /// IRQ Handler for USART2
 void USART2_IRQHandler(void) {
+USART_TypeDef  *uart = USART2;
 
-    PROCESS_INTERRUPT(USART2,2);
-
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[2].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // RX not empty
+        if ( uarttab[2].outbuffer ) {
+            uart->TDR = uarttab[2].outbuffer;
+            uarttab[2].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 
 /// IRQ Handler for USART3
 void USART3_IRQHandler(void) {
+USART_TypeDef  *uart = USART3;
 
-    PROCESS_INTERRUPT(USART3,3);
-
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[3].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
+        if ( uarttab[3].outbuffer ) {
+            uart->TDR = uarttab[3].outbuffer;
+            uarttab[3].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 
 /// IRQ Handler for UART4
 void UART4_IRQHandler(void) {
+USART_TypeDef  *uart = UART4;
 
-    PROCESS_INTERRUPT(UART4,4);
-
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[4].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX  empty
+        if ( uarttab[4].outbuffer ) {
+            uart->TDR = uarttab[4].outbuffer;
+            uarttab[4].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 
 /// IRQ Handler for UART5
 void UART5_IRQHandler(void) {
+USART_TypeDef  *uart = UART5;
 
-    PROCESS_INTERRUPT(UART5,5);
-
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        uarttab[5].inbuffer = uart->RDR;
+    }
+    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
+        if ( uarttab[5].outbuffer ) {
+            uart->TDR = uarttab[5].outbuffer;
+            uarttab[5].outbuffer = 0;
+        }
+    }
+    uart->ICR = 0x00121BDF;     // Clear all pending interrupts
 }
 ///@}
 
@@ -208,6 +231,10 @@ uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 
     uart = uarttab[uartn].device;
+
+    // Configure pin
+    ConfigurePin(&uarttab[uartn].txpinconf);
+    ConfigurePin(&uarttab[uartn].rxpinconf);
 
     // Enable Clock
     if ( uartn == 0 ) {         // LPUART1
@@ -273,18 +300,10 @@ USART_TypeDef * uart;
     uart->CR1 |= USART_CR1_TXEIE;       // Enable interrupt when TX is empty
 
     // Enable interrupts on NVIC
-    NVIC_SetPriority(uarttab[uartn].info.irqn,uarttab[uartn].info.irqlevel);
-    NVIC_ClearPendingIRQ(uarttab[uartn].info.irqn);
-    NVIC_EnableIRQ(uarttab[uartn].info.irqn);
+    NVIC_SetPriority(uarttab[uartn].irqn,uarttab[uartn].irqlevel);
+    NVIC_ClearPendingIRQ(uarttab[uartn].irqn);
+    NVIC_EnableIRQ(uarttab[uartn].irqn);
 
-    if( uarttab[uartn].info.buffered ) {
-        uarttab[uartn].in.buffer  = buffer_init(
-                                uarttab[uartn].in.buffer,
-                                uarttab[uartn].info.size);
-        uarttab[uartn].out.buffer = buffer_init(
-                                uarttab[uartn].out.buffer,
-                                uarttab[uartn].info.size);
-    }
     // Enable UART
     uart->CR1 |= USART_CR1_UE;
     return 0;
@@ -300,7 +319,7 @@ UART_WriteChar(int uartn, unsigned c) {
 USART_TypeDef *uart;
 
     // wait until buffer free
-    while ( uarttab[uartn].out.byte != 0 ) {}
+    while ( uarttab[uartn].outbuffer != 0 ) {}
     // send it
     uart->TDR = c;
 
@@ -332,9 +351,9 @@ int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
 
-    while( uarttab[uartn].in.byte == 0 ) {}
+    while( uarttab[uartn].inbuffer == 0 ) {}
 
-    return uarttab[uartn].in.byte;
+    return uarttab[uartn].inbuffer;
 
 }
 
@@ -387,8 +406,8 @@ USART_TypeDef *uart;
 
     uart = uarttab[uartn].device;
 
-    uarttab[uartn].in.byte  = 0;
-    uarttab[uartn].out.byte = 0;
+    uarttab[uartn].inbuffer  = 0;
+    uarttab[uartn].outbuffer = 0;
 
     return 0;
 

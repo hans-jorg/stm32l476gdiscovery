@@ -38,21 +38,110 @@
 
 
 /**
+ * @brief   Pin configuration
+ */
+typedef struct {
+    GPIO_TypeDef   *gpio;
+    int             pin;
+    int             af;
+} PinConfiguration;
+
+/**
+ ** @brief Info and data area for UARTS
+ **/
+typedef struct {
+    USART_TypeDef      *device;
+    PinConfiguration    txpinconf;
+    PinConfiguration    rxpinconf;
+} UART_Info;
+
+/**
  ** @brief List of known UARTs
  **
- ** @note  Actually pointers to UARTs
  **/
 //@{
-static USART_TypeDef *uarttab[] = {
-    LPUART1,
-    USART1,
-    USART2,
-    USART3,
-    UART4,
-    UART5
+static UART_Info uarttab[] = {
+    /* Device        txconfig        rxconfig    */
+    /*              Port  Pin AF    Port  Pin AF */
+    { LPUART1,   { GPIOB,11, 8 },{ GPIOB,10, 8 } },
+    { USART1,    { GPIOG, 9, 7 },{ GPIOG,10, 7 } },
+    { USART2,    { GPIOD, 5, 7 },{ GPIOD, 6, 7 } },
+    { USART3,    { GPIOD, 8, 7 },{ GPIOD, 9, 7 } },
+    { UART4,     { GPIOA, 0, 8 },{ GPIOD, 1, 8 } },
+    { UART5,     { GPIOC,12, 8 },{ GPIOD, 2, 8 } }
 };
-static const int uarttabsize = sizeof(uarttab)/sizeof(USART_TypeDef *);
+static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info *);
 //@}
+
+/**
+ * @brief   Enable GPIO
+ *
+ * @note    Should be in gpio.[ch]
+ *
+ */
+void GPIO_Enable(GPIO_TypeDef *gpio) {
+
+    if( gpio == GPIOA ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;
+    } else if ( gpio == GPIOB ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;
+    } else if ( gpio == GPIOC ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;
+    } else if ( gpio == GPIOD ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIODEN;
+    } else if ( gpio == GPIOE ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;
+    } else if ( gpio == GPIOF ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOFEN;
+    } else if ( gpio == GPIOG ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOGEN;
+    } else if ( gpio == GPIOH ) {
+        RCC->AHB2ENR |= RCC_AHB2ENR_GPIOHEN;
+    } else {
+        return;
+    }
+}
+
+/**
+ * @brief   Enable UART
+ */
+void UART_Enable(USART_TypeDef *uart) {
+
+    if ( uart == LPUART1 ) {
+        RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
+    } else if ( uart == USART1 ) {
+        RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+    } else if ( uart == USART2 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_USART2EN;
+    } else if ( uart == USART3 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_USART3EN;
+    } else if ( uart == UART4 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_UART4EN;
+    } else if ( uart == UART5 ) {
+        RCC->APB1ENR1 |= RCC_APB1ENR1_UART5EN;
+    }
+}
+
+/**
+ * @brief   Configure Pin
+ */
+static void ConfigurePin(PinConfiguration *conf) {
+GPIO_TypeDef *gpio;
+int pos;
+
+    gpio = conf->gpio;
+
+    // Enable clock for GPIOx, if it is not already enabled
+    GPIO_Enable(gpio);
+
+    if( conf->pin > 7 ) {
+        pos = (conf->pin - 7)*4;
+        gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos))|(conf->af<<pos);
+    } else {
+        pos = (conf->pin)*4;
+        gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos))|(conf->af<<pos);
+    }
+}
 
 /**
  ** @brief UART Initialization
@@ -64,25 +153,24 @@ UART_Init(int uartn, uint32_t info) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 
-    uart = uarttab[uartn];
+    uart = uarttab[uartn].device;
 
-    // Enable Clock
-    if ( uartn == 0 ) {         // LPUART1
-        RCC->APB1ENR2 |= RCC_APB1ENR2_LPUART1EN;
-    } else if ( uartn == 1 ) {  // USART1
-        RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
-    } else {                      // USART2..5
-        RCC->APB1ENR1 |= BIT(uartn+17-2); // RCC_APB1ENR1_USARTxEN
-    }
+    // Configure pins
+    ConfigurePin(&uarttab[uartn].txpinconf);
+    ConfigurePin(&uarttab[uartn].rxpinconf);
 
     // Configuration of LPUART is after the last UART
     if( uartn == 0 ) uartn = uarttabsize;
 
+    // Select clock source
     t = RCC->CCIPR&~BITVALUE(3,uartn*2-2);
     t |= BITVALUE(1,uartn*2-2); // SYSCLK as Clock Source
     RCC->CCIPR = t;
 
-    // Configure
+    // Enable Clock
+    UART_Enable(uart);
+
+    // Configure UART
     t = uart->CR1;
     t &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
     switch( info&UART_SIZE ) {
@@ -138,7 +226,7 @@ UART_WriteChar(int uartn, uint32_t c) {
 USART_TypeDef *uart;
 
 
-    uart = uarttab[uartn];
+    uart = uarttab[uartn].device;
 
     while( (uart->ISR&USART_ISR_TEACK)==0 ) {}
     uart->TDR = c;
@@ -171,7 +259,7 @@ int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
 
-    uart = uarttab[uartn];
+    uart = uarttab[uartn].device;
 
     while( (uart->ISR & USART_ISR_RXNE) == 0 ) {}
     return uart->RDR;
@@ -210,7 +298,7 @@ int
 UART_GetStatus(int uartn) {
 USART_TypeDef *uart;
 
-    uart = uarttab[uartn];
+    uart = uarttab[uartn].device;
 
     return uart->ISR;
 
