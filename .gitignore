@@ -1,3 +1,4 @@
+.gitignore
 TODO.md
 *.odt
 gcc/
@@ -5,3 +6,4 @@ html/
 copyfilestoprojects
 teste-uart/
 Docs/
+*.odt

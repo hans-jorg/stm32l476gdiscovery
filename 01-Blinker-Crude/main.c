@@ -39,14 +39,6 @@ void ms_delay(volatile int ms) {
  *
  */
 
-//@{
-/// Must be Pin numbers not Masks
-/// LED on GPIO Port E
-#define LED_GREEN  (8)
-/// LED on GPIO Port B
-#define LED_RED    (2)
-//@}
-
 int main(void) {
 
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOEEN;   // Enable GPIO Port E
@@ -55,22 +47,22 @@ int main(void) {
     __DSB();
 
     /* Clear field and set desired value */
-    GPIOB->MODER   = ((GPIOB->MODER&~(3<<(LED_RED*2)))    | (1<<(LED_RED*2)));   // Set to output
-    GPIOB->OSPEEDR = ((GPIOB->OSPEEDR&~(3<<(LED_RED*2)))  | (3<<(LED_RED*2)));   // Set to high speed
-    GPIOB->PUPDR   = ((GPIOB->PUPDR&~(3<<(LED_RED*2)))    | (1<<(LED_RED*2)));   // Set to pull up
-    GPIOB->ODR    |= (1<<LED_RED);
+    GPIOB->MODER   = ((GPIOB->MODER&~(3<<(2*2)))    | (1<<(2*2)));   // Set to output
+    GPIOB->OSPEEDR = ((GPIOB->OSPEEDR&~(3<<(2*2)))  | (3<<(2*2)));   // Set to high speed
+    GPIOB->PUPDR   = ((GPIOB->PUPDR&~(3<<(2*2)))    | (1<<(2*2)));   // Set to pull up
+    GPIOB->ODR    |= (1<<2);
 
-    GPIOE->MODER   = ((GPIOE->MODER&~(3<<(LED_GREEN*2)))  | (1<<(LED_GREEN*2))); // Set to output
-    GPIOE->OSPEEDR = ((GPIOE->OSPEEDR&~(3<<(LED_GREEN*2)))| (3<<(LED_GREEN*2))); // Set to high speed
-    GPIOE->PUPDR   = ((GPIOE->PUPDR&~(3<<(LED_GREEN*2)))  | (1<<(LED_GREEN*2))); // Set to pull up
-    GPIOE->ODR    &= ~(1<<LED_GREEN);
+    GPIOE->MODER   = ((GPIOE->MODER&~(3<<(8*2)))  | (1<<(8*2))); // Set to output
+    GPIOE->OSPEEDR = ((GPIOE->OSPEEDR&~(3<<(8*2)))| (3<<(8*2))); // Set to high speed
+    GPIOE->PUPDR   = ((GPIOE->PUPDR&~(3<<(8*2)))  | (1<<(8*2))); // Set to pull up
+    GPIOE->ODR    &= ~(1<<8);
 
 
 
     for (;;) {
        ms_delay(500);
-       GPIOB->ODR ^= (1 << LED_RED);       // Use XOR to toggle output
-       GPIOE->ODR ^= (1 << LED_GREEN);     // Use XOR to toggle output
+       GPIOB->ODR ^= (1 << 2);       // Use XOR to toggle output
+       GPIOE->ODR ^= (1 << 8);     // Use XOR to toggle output
     }
 
     /* NEVER */

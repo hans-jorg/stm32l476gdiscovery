@@ -1,57 +1,9 @@
 STM32L476DISCOVERY
 ====================
 
-The STM32LDiscovery has a STM32L476VGT6 microcontroller and an embedded ST-LINK/V2-1 debugging interface.
+TBD: To be done
+TBT: To be tested
 
-The microcontroller has the following specifications:
-
-* 1 MByte Flash memory
-* 128 KByte of RAM
-* I2C interfaces (3 units)
-* SPI interface (3 units)
-* UART interface (6 units)
-* CAN interface
-* 12 bit ADC
-* 12 bit DAC
-* LCD driver
-* Touch sensing
-* USB OTG Full Speed interface
-* Flexible memory controller
-
-Additionally, the board has:
-
-* LCD with 24 segments
-* LEDs (red and green)
-* Pushbutton
-* Joystick
-* Audio DAC
-* MEMS (Gyroscope/Accelerometer/Magnetometer)
-* 128 MBit Quad SPI Flash Memory
-* Embedded Ammeter to measure comsumption of the STM32L476 microcontroller
-
-The board can be powered by one of the following
-
-* ST_LINK V2-1
-* USB FS Connector
-* External 5 V
-* CR2032 battery
-
-### Energy supply
-
-### Serial interface
-
-There are two serial interface that can be used during debugging.]
-
-* There is a serial connection between target MCU STM32L476 and the host MCU (a STM32F103CBT6).
-* There is a virtual serial connection, that shares the debug connections.
-
-The serial connection
-
-Signal      | Connector |  Jumper   |   Pin     |  AF  |  Device       |
-------------|-----------|-----------|-----------|------|---------------|
-USART RX    |  JP4 RX   |  SB16     |   PD6     |  7   |   USART2      |   
-USART TX    |  JP4 TX   |  SB13     |   PD5     |  7   |   USART2      |
- 
 ## A Step-By-Step Introduction to Software Development for the STM32L476G Discovery Board
  
 * [Project 01: Very Simple Blinker](#project-01:-very-simple-blinker)
@@ -99,50 +51,96 @@ The same as project 01 but using pin numbers for LEDs.
 
 #### Project 04: Blinker using HAL for GPIO
 
+Using a GPIO HAL to blink LEDS
+
 #### Project 05: Blinker with reusable HAL for GPIO
+
+
 
 #### Project 06: Blinker with Systick
 
+
+
 #### Project 07: Joystick controls blinking
+
+
 
 #### Project 08: Joystick using polling
 
+
+
 #### Project 09: Joystick using interrupts
+
+
 
 #### Project 10: Blinker with State Machine and Interrupts
 
+
+
 #### Project 11: Blinker with Predefined Symbols
+
+
 
 #### Project 12: Blink with HAL for LEDs
 
+
+
 #### Project 13: Joystick with HAL for Joystick
+
+
 
 #### Project 14: Using UART with Polling
 
+
+
 #### Project 15: Using UART with Interrupts TBT
+
+
 
 #### Project 16: Newlib TBT
 
+
+
 #### Project 17: TimeTriggered
+
+
 
 #### Project 18: TimeTriggered v2
 
+
+
 #### Project 19: Protothreads
+
+Using Protothreads as in [Protothreads](http://dunkels.com/adam/pt/)
 
 #### Project 20: Rios
 
+Using the Rios as in [RIOS](https://www.cs.ucr.edu/~vahid/rios/)
+
 #### Project 21: SST
+
+Using the SST as in  [Build a Super Simple Tasker](https://www.embedded.com/build-a-super-simple-tasker/)
 
 #### Project 22: WatchDog TBT
 
+Testing the watchdog;.
+
 #### Project 23: FreeRTOS
+
+Blink LEDs with FreeRTOS.
 
 #### Project 24: ucos2 TBT
 
+Blink LEDs with ucos2.
+
 #### Project 25: ucos3 TBT
+
+Blink LEDs with ucos3.
 
 #### Project 26: Using the LCD
 
+Driving the LCD.
+
 #### Project 27: Getting the Temperature
 
-
+Using the internal temperature sensor to get and show temperature.

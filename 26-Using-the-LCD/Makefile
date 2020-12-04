@@ -71,8 +71,6 @@ OPENOCDDIR=/usr/share/openocd
 # CMSIS Dir
 CMSISDIR=../../STM32CubeL4/Drivers/CMSIS
 endif
-# FreeRTOS Dir
-FREERTOSDIR=../../../FreeRTOSv10/FreeRTOS
 
 #
 # Source files
@@ -283,45 +281,6 @@ TERMAPP=gnome-terminal
 # Editor to be used
 #
 EDITOR=gedit
-
-#
-# Include path for FreeRTOS
-#
-FREERTOSCONFIGDIR=.
-FREERTOSINCDIR= . ${FREERTOSDIR}/Source/include
-FREERTOSPORTINCDIR=${FREERTOSDIR}/Source/portable/GCC/ARM_CM4F/
-
-#
-# Source files for FreeRTOS
-#
-
-FREERTOSSRCFILES=${FREERTOSDIR}/Source/tasks.c \
-                 ${FREERTOSDIR}/Source/queue.c \
-                 ${FREERTOSDIR}/Source/list.c
-#optionals
-FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/timers.c
-FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/croutine.c
-
-# Use one of the below files according the desired head management strategy
-#  heap_1.c Very simple. Memory is not freed.
-#  heap_2.c Simple. Memory is freed but not coalesced
-#  heap_3.c Add thread safety
-#  heap_4.c Standard
-#  heap_5.c Can use not contiguos memory areas
-#
-FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_1.c
-#FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_2.c
-#FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_3.c
-#FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_4.c
-#FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/MemMang/heap_5.c
-#compiler and cpu specific files
-FREERTOSSRCFILES+= ${FREERTOSDIR}/Source/portable/GCC/ARM_CM4F/port.c
-FREERTOSFLAGS=-DENABLE_FPU
-#
-FREERTOSOBJFILES2=$(notdir $(FREERTOSSRCFILES:.c=.o))
-
-FREERTOSOBJFILES=$(addprefix ${OBJDIR}/,${FREERTOSOBJFILES2})
-OBJFILES+= ${FREERTOSOBJFILES}
 
 
 ###############################################################################
