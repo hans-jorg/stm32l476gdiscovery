@@ -206,7 +206,7 @@ int k;
     return -1;
 }
 
-static uint32_t ADC_ConfigureChannel(ADC_TypeDef *adc, uint32_t ch, uint32_t config) {
+int ADC_ConfigureChannel(ADC_TypeDef *adc, uint32_t ch, uint32_t config) {
 uint32_t k;
 GPIO_TypeDef *gpio;
 int pin;
@@ -336,7 +336,7 @@ uint32_t timeout_cnt;
 
     adc->CR |= ADC_CR_ADEN;
 
-    adc->ISR = ADC_ISR_ADRDY;
+    adc->ISR |= ADC_ISR_ADRDY;
 
     timeout_cnt = 4000;
     while( timeout_cnt && ((adc->ISR&ADC_ISR_ADRDY)==0)) timeout_cnt--;
@@ -365,7 +365,7 @@ uint32_t timeout_cnt;
     //Clear the ADRDY bit in the ADCx_ISR register by writing ‘1’.
     ADC1->ISR    |= ADC_ISR_ADRDY;
 
-    adc->CR = ADC_CR_ADSTART;
+    adc->CR |= ADC_CR_ADSTART;
 
 
 /*    timeout_cnt = 4000;*/
@@ -413,7 +413,7 @@ uint32_t timeout_cnt;
     //adc->CFGR &= ~ADC_CFGR_EXTEN;
 
     // Start conversion
-    adc->CR = ADC_CR_ADSTART;
+    adc->CR |= ADC_CR_ADSTART;
     for(i=0;i<n;i++) {
         timeout_cnt = 4000;
         while( timeout_cnt && ((adc->ISR&ADC_ISR_EOC)==0)) timeout_cnt--;

@@ -98,6 +98,10 @@ char s[6];
 
     LCD_Clear();
 
+    ADC_Init(ADC1);
+
+    ADC_ConfigureChannel(ADC1,10,0);
+
     for (;;) {
         Delay(1000);
         temp = ADC_ReadTemperature();

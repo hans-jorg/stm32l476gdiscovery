@@ -13,7 +13,7 @@
 
 
 int     ADC_Init(ADC_TypeDef *adc);
-int     ADC_ConfigChannel(ADC_TypeDef *adc, uint32_t ch, uint32_t config);
+int     ADC_ConfigureChannel(ADC_TypeDef *adc, uint32_t ch, uint32_t config);
 int32_t ADC_Read(ADC_TypeDef *adc, uint32_t ch);
 int     ADC_ReadMultiple(ADC_TypeDef *adc, uint32_t *ch, uint32_t *val, int n);
 int32_t ADC_ReadTemperature(void);
