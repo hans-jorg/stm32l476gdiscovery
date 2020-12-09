@@ -293,72 +293,55 @@ uint32_t timeout_cnt;
     RCC->CCIPR  =  (RCC->CCIPR&~RCC_CCIPR_ADCSEL_Msk) | (3<<RCC_CCIPR_ADCSEL_Pos);
 
     // Turn off DEEPPWD (default after reset))
-    ADC1->CR     &= ~ADC_CR_DEEPPWD;
+    adc->CR     &= ~ADC_CR_DEEPPWD;
 
     // Turn on voltage regulator
-    ADC1->CR     |= ADC_CR_ADVREGEN;
+    adc->CR     |= ADC_CR_ADVREGEN;
 
     // Enable the ADC clock, and GPIOA clk Depends on which ADC pins used
     RCC->AHB2ENR |= (RCC_AHB2ENR_ADCEN|RCC_AHB2ENR_GPIOAEN);
 
-    // Enable analog mode for pin (Depends on which ADC pins used)
-    GPIOA->ASCR  |= GPIO_ASCR_ASC0;
+    /*
+     * Boost enable for high VDDA
+     *     0: I/O analog switches are supplied by V DDA voltage. This is the
+     *        recommended configuration when using the ADC in high V DDA voltage
+     *        operation.
+     *     1: I/O analog switches are supplied by a dedicated voltage booster
+     *        (supplied by V DD ). This is the recommended configuration when
+     *        using the ADC in low V DDA voltage operation.
+     */
+    //SYSCFG->CFGR1 |= SYSCFG_CFGR1_BOOSTEN;
 
-    // Configure pin for analog mode (again?)
-    GPIOA->MODER |= (3<<GPIO_MODER_MODE0_Pos);
+    int presc = 3;
+    int ckmode = 0;
 
-    //Clear the ADRDY bit in the ADCx_ISR register by writing ‘1’.
-    ADC1->ISR    |= ADC_ISR_ADRDY;
-
-    //Set for a sequence of 1 conversion on CH0
-    ADC1->SQR1   |= (1)<<ADC_SQR1_SQ1_Pos;
-
-
-    udelay(1000);
-#if 0
-/////////// antigo
-    // Use System Clock for ADC
-    BITFIELDSET(RCC->CCIPR,RCC_CCIPR_ADCSEL,BITVALUE(3,28));
-
-    // ?????
-    //SYSCFG->CFGR1 |= SYSCFG_CFGR1_BOOSTEN; // Boost enable for high VDDA
-
-    t = ADC123_COMMON->CCR;
-    BITFIELDSET(t,ADC_CCR_CKMODE,BITVALUE(1,16)); // Set to highest frequency
-#if 0
-    // Only for injected ????
-    if( (RCC->CFGR  & RCC_CFGR_HPRE)>>4) == 1 ) {
+    if( ((RCC->CFGR&RCC_CFGR_HPRE)>>4) == 1 ) {
         presc = 1;
     } else {
         presc = 2;
     }
-    BITFIELDSET(t,ADC_CCR_PRESC,BITVALUE(presc,16)); // Set to highest frequency
-#endif
-    ADC123_COMMON->CCR = t;
 
+    ADC123_COMMON->CCR = (ADC123_COMMON->CCR
+                                &~(ADC_CCR_PRESC_Msk|ADC_CCR_CKMODE_Msk))
+                         |(presc<<ADC_CCR_PRESC_Pos)
+                         |(ckmode<<ADC_CCR_CKMODE_Pos);
 
-
+    // Calibration
+ #if 0
     adc->CR |= ADC_CR_ADCAL;          // start calibration
 
     timeout_cnt = 4000;
     while( timeout_cnt && ((adc->CR&ADC_CR_ADCAL)==1) ) timeout_cnt--;
+#endif
 
-
-    t = ADC123_COMMON->CCR;
-    BITFIELDSET(t,ADC_CCR_PRESC, BITVALUE(1,18) );     // ADC Prescaler : ADCCLK/2
-    BITFIELDSET(t,ADC_CCR_CKMODE, BITVALUE(2,16) );    // ADC Clock : HCLK/2
-    t |= ADC_CCR_VBATEN;
-    t |= ADC_CCR_TSEN;
-    t |= ADC_CCR_VREFEN;
-    ADC123_COMMON->CCR = t;
-
-    adc->ISR |= ADC_ISR_ADRDY;
     adc->CR |= ADC_CR_ADEN;
+
+    adc->ISR = ADC_ISR_ADRDY;
+
     timeout_cnt = 4000;
     while( timeout_cnt && ((adc->ISR&ADC_ISR_ADRDY)==0)) timeout_cnt--;
-    if( timeout_cnt == 0 ) return 1;
-    adc->ISR &= ~ADC_ISR_ADRDY;
-#endif
+    if( timeout_cnt == 0 ) return -1;
+
     return 0;
 }
 
@@ -366,19 +349,30 @@ int32_t ADC_Read(ADC_TypeDef *adc, uint32_t ch) {
 uint32_t v=0;
 uint32_t timeout_cnt;
 
-    // reset flags
+    // Reset flags
     adc->ISR = ADC_ISR_EOC|ADC_ISR_OVR|ADC_ISR_JEOC|ADC_ISR_EOS|ADC_ISR_ADRDY;
 
-    BITFIELDSET(adc->CFGR,ADC_CFGR_RES,0);
+    // Set Resolution
+    adc->CFGR = (adc->CFGR&~(ADC_CFGR_RES_Msk))
+                |(0<<ADC_CFGR_RES_Pos);
 
+    // Specify channel
     adc->SQR1 = (ch<<6)|1; // only one channel is sequence
-    adc->CFGR &= ~ADC_CFGR_CONT;
-    adc->CR |= ADC_CR_ADSTART;
-    adc->CFGR &= ~ADC_CFGR_EXTEN;
 
-    timeout_cnt = 4000;
-    while( timeout_cnt && ((adc->ISR&ADC_ISR_EOC)==0)) timeout_cnt--;
-    if( timeout_cnt == 0 ) return -1;
+    // Single conversion and not hardware trigger
+    adc->CFGR &= ~(ADC_CFGR_CONT|ADC_CFGR_EXTEN_Msk);
+
+    //Clear the ADRDY bit in the ADCx_ISR register by writing ‘1’.
+    ADC1->ISR    |= ADC_ISR_ADRDY;
+
+    adc->CR = ADC_CR_ADSTART;
+
+
+/*    timeout_cnt = 4000;*/
+/*    while( timeout_cnt && ((adc->ISR&ADC_ISR_EOC)==0)) timeout_cnt--;*/
+/*    if( timeout_cnt == 0 ) return -1;*/
+
+    while( (adc->ISR&ADC_ISR_EOC)==0 ) {}
     v = adc->DR;
 
 #if 0
@@ -416,9 +410,10 @@ uint32_t timeout_cnt;
     adc->SQR3 = sqr3;
     adc->SQR4 = sqr4;
 
-    adc->CR |= ADC_CR_ADSTART;
-    adc->CFGR &= ~ADC_CFGR_EXTEN;
+    //adc->CFGR &= ~ADC_CFGR_EXTEN;
 
+    // Start conversion
+    adc->CR = ADC_CR_ADSTART;
     for(i=0;i<n;i++) {
         timeout_cnt = 4000;
         while( timeout_cnt && ((adc->ISR&ADC_ISR_EOC)==0)) timeout_cnt--;
