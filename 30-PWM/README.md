@@ -72,6 +72,46 @@ specified value, it is then set to zero.
 
 In many cases, the polarity can be inverted and the counter can count backwards.
 
+General Purpose Timers
+----------------------
+
+TIM2, TIM3, TIM4 and TIM5 are general purpose timers and can be used to implement PWM.
+TIM2 and TIM5 have 32 bit counters and the others, 16 bit counters.
+
+The most important registers to configure PWM are:
+
+* CNT: 16-bit (or 32 bit) Counter 
+* PSC: Prescaler (1-65536)
+* ARR: Auto reload register/Top value register
+* CR1: Configuration 
+* CCRx: Reference value
+
+In the upcouting mode, the CNT counts from 0 to the value stored in ARR and the restarts from 0.
+When the CNT is less than CCRX, the output is high. When it is greater than CCRx, the output is low.
+But this can be inverted by setting bit CCxP bit of CCER.
+
+There are two PWM modes;
+
+* Mode 1: When upcounting, channel is active as long as CNT<CCR1 else inactive
+* Mode 2: When upcounting, channel is inactive as long as CNT<CCR1 else active
+
+
+To set PWM mode:
+
+* Enable clock for gpio
+* Configure gpio pin to alternate function
+* Enable clock for timer
+* Set OCxM field in CCMRx to 0110 (mode 1) or 0111 (mode 2)
+* Set OCXPE bit in CCMRx to preload
+* Set ARPE bit in CR1 to auto-reload CNT
+* Clear DIR bit of CR1 to upcounting
+* Set polarity by clearing or setting bit CCxP of CCER.
+* Enable output pin by setting CCxE bit in CCER.
+* Before starting the counter, set UG bit in EGR register (forced update)
+
+
+
+
 
 
 

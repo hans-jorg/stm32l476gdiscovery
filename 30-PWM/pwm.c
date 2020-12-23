@@ -115,6 +115,10 @@ static const TIM_PinInfo pininfo[] = {
 #define TIMER_SIZE16                    0
 #define TIMER_SIZE32                    1
 
+#define TIMER_APB11                     1
+#define TIMER_APB12                     2
+#define TIMER_APB2                      3
+
 typedef struct {
     TIM_TypeDef     *timer;
     uint32_t        clockenable;
@@ -125,20 +129,20 @@ typedef struct {
 } TIM_Parameters;
 
 static const TIM_Parameters timparameters[] = {
-    {   TIM1,    RCC_APB2ENR_TIM1EN,    2,  1, TIMER_SIZE16, TIMER_TYPEADVANCED },
-    {   TIM2,    RCC_APB1ENR1_TIM2EN,   1,  2, TIMER_SIZE32, TIMER_TYPEGENERAL },
-    {   TIM3,    RCC_APB1ENR1_TIM3EN,   1,  3, TIMER_SIZE16, TIMER_TYPEGENERAL },
-    {   TIM4,    RCC_APB1ENR1_TIM4EN,   1,  4, TIMER_SIZE16, TIMER_TYPEGENERAL },
-    {   TIM5,    RCC_APB1ENR1_TIM5EN,   1,  5, TIMER_SIZE32, TIMER_TYPEGENERAL },
-    {   TIM6,    RCC_APB1ENR1_TIM6EN,   1,  6, TIMER_SIZE16, TIMER_TYPEBASIC },
-    {   TIM7,    RCC_APB1ENR1_TIM7EN,   1,  7, TIMER_SIZE16, TIMER_TYPEBASIC },
-    {   TIM8,    RCC_APB2ENR_TIM8EN,    2,  8, TIMER_SIZE16, TIMER_TYPEADVANCED },
-    {   TIM15,   RCC_APB2ENR_TIM15EN,   2, 15, TIMER_SIZE16, TIMER_TYPEGENERALSIMPLE },
-    {   TIM16,   RCC_APB2ENR_TIM16EN,   2, 16, TIMER_SIZE16, TIMER_TYPEGENERALSIMPLE },
-    {   TIM17,   RCC_APB2ENR_TIM17EN,   2, 17, TIMER_SIZE16, TIMER_TYPEGENERALSIMPLE },
-    {   LPTIM1,  RCC_APB1ENR2_LPTIM2EN, 3, 20, TIMER_SIZE16, TIMER_TYPELOWPOWER }
-    {   LPTIM2,  RCC_APB1ENR2_LPTIM2EN, 3, 20, TIMER_SIZE16, TIMER_TYPELOWPOWER }
-    {   0,  0   }
+{   TIM1,    RCC_APB2ENR_TIM1EN,    TIMER_APB2,   1, TIMER_SIZE16, TIMER_TYPEADVANCED      },
+{   TIM2,    RCC_APB1ENR1_TIM2EN,   TIMER_APB11,  2, TIMER_SIZE32, TIMER_TYPEGENERAL       },
+{   TIM3,    RCC_APB1ENR1_TIM3EN,   TIMER_APB11,  3, TIMER_SIZE16, TIMER_TYPEGENERAL       },
+{   TIM4,    RCC_APB1ENR1_TIM4EN,   TIMER_APB11,  4, TIMER_SIZE16, TIMER_TYPEGENERAL       },
+{   TIM5,    RCC_APB1ENR1_TIM5EN,   TIMER_APB11,  5, TIMER_SIZE32, TIMER_TYPEGENERAL       },
+{   TIM6,    RCC_APB1ENR1_TIM6EN,   TIMER_APB11,  6, TIMER_SIZE16, TIMER_TYPEBASIC         },
+{   TIM7,    RCC_APB1ENR1_TIM7EN,   TIMER_APB11,  7, TIMER_SIZE16, TIMER_TYPEBASIC         },
+{   TIM8,    RCC_APB2ENR_TIM8EN,    TIMER_APB2,   8, TIMER_SIZE16, TIMER_TYPEADVANCED      },
+{   TIM15,   RCC_APB2ENR_TIM15EN,   TIMER_APB2,  15, TIMER_SIZE16, TIMER_TYPESIMPLE        },
+{   TIM16,   RCC_APB2ENR_TIM16EN,   TIMER_APB2,  16, TIMER_SIZE16, TIMER_TYPESIMPLE        },
+{   TIM17,   RCC_APB2ENR_TIM17EN,   TIMER_APB2,  17, TIMER_SIZE16, TIMER_TYPESIMPLE        },
+//{   LPTIM1,  RCC_APB1ENR2_LPTIM2EN, TIMER_APB12, 20, TIMER_SIZE16, TIMER_TYPELOWPOWER      },
+//{   LPTIM2,  RCC_APB1ENR2_LPTIM2EN, TIMER_APB12, 20, TIMER_SIZE16, TIMER_TYPELOWPOWER      },
+{   0,       0,                     0,            0, 0,            0                       }
 };
 
 static const TIM_Parameters *findparameters(TIM_TypeDef *timer) {
@@ -208,14 +212,17 @@ int af;
 
     // Disable timer (Just in case)
     timer->CR1 &= ~TIM_CR1_CEN;
+
+
     /*
      * Configure GPIO
      */
+
+
     /* Configure pin as output and set alternate function */
     GPIO_EnableClock(gpio);
     GPIO_ConfigurePins(gpio, (1U<<pin), GPIO_CONF_OUT);
     GPIO_ConfigureAlternateFunction(gpio,pin,pinfo->af);
-
 
     /*
      * Configure timer
@@ -225,40 +232,76 @@ int af;
     if( ptim->apb == 1 ) {
         RCC->APB1ENR1 |=  ptim->clockenable;
     } else {
-        RCC->APB2ENR |=  ptim->clockenable;
+        RCC->APB2ENR  |=  ptim->clockenable;
     }
     /* Set divider to 1, i.e. prescaler to 0 */
     timer->PSC = 0;
     timer->SMCR = (timer->SMCR&~(TIM_SMCR_SMS_Msk))|(0<<TIM_SMCR_SMS_Pos);
+    timer->ARR  = (uint32_t) (-1);
+    timer->CR1 &= ~(TIM_CR1_DIR|TIM_CR1_CMS_Msk|TIM_CR1_UDIS);
+    timer->CR1 |= TIM_CR1_ARPE;
+
+    // Counter mode = 0 -> Upcounting
+    //
+
+    /*
+     * Configure channel
+     *
+     * OCx active high
+     *
+     */
+// PWMMODE 2
+#define PWMMODE  6
+// PWMMODE 2
+//#define PWMMODE  7
 
     switch(channel) {
     case 1:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC1NP))
+                        |(TIM_CCER_CC1E);
         timer->CCR1 = 0;
-        timer->CCMR = 0; // OCxM=110|111 ???? OCxPE=1?
+        timer->CCMR1 = (timer->CCMR1
+                            &~(  TIM_CCMR1_CC1S_Msk
+                                |TIM_CCMR1_OC1M_Msk))
+                        |TIM_CCMR1_OC1PE
+                        |(PWMMODE<<TIM_CCMR1_OC1M_Pos);
         break;
     case 2:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC2NP))
+                        |(TIM_CCER_CC2E);
         timer->CCR2 = 0;
-
+        timer->CCMR1 = (timer->CCMR1
+                            &~(  TIM_CCMR1_CC2S_Msk
+                                |TIM_CCMR1_OC2M_Msk))
+                        |TIM_CCMR1_OC2PE
+                        |(PWMMODE<<TIM_CCMR1_OC2M_Pos);
         break;
     case 3:
-        timer->CCR3 = 0;
-
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC3NP))
+                        |(TIM_CCER_CC3E);
+        timer->CCR4 = 0;
+        timer->CCMR1 = (timer->CCMR2
+                            &~(  TIM_CCMR2_CC3S_Msk
+                                |TIM_CCMR2_OC3M_Msk))
+                        |TIM_CCMR2_OC3PE
+                        |(PWMMODE<<TIM_CCMR2_OC3M_Pos);
         break;
     case 4:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC4NP))
+                        |(TIM_CCER_CC4E);
         timer->CCR4 = 0;
-
+        timer->CCMR1 = (timer->CCMR2
+                            &~(  TIM_CCMR2_CC4S_Msk
+                                |TIM_CCMR2_OC4M_Msk))
+                        |TIM_CCMR2_OC4PE
+                        |(PWMMODE<<TIM_CCMR2_OC4M_Pos);
         break;
     default:
         return -3;
     }
 
-    timer->ARR  = (uint32_t) (-1);
-
-
-
     // timer enable
-    timer->CR1 &= ~TIM_CR1_DIR;
-    timer->CR1 |= TIM_CR1_ARPE|TIM_CR1_CEN;
+    timer->CR1 |= TIM_CR1_CEN;
 
     return 0;
 }
@@ -286,17 +329,47 @@ int PWM_Set(TIM_TypeDef *timer, unsigned channel, unsigned value) {
 
 int PWM_Config(TIM_TypeDef *timer, unsigned channel, unsigned top, unsigned div, int pol) {
 
-    if( pol ) {
-        timer->CCER = 0; // CCxP  | CCxE
-    } else {
-        timer->CCER = 0; // CCxP  | CCxE
+    /* Set polarity */
+    pol = !!pol; // 0 or 1
+    switch( channel ) {
+    case 1:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC1NP))
+                        |(pol<<TIM_CCER_CC1NP_Pos);
+        break;
+    case 2:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC2NP))
+                        |(pol<<TIM_CCER_CC2NP_Pos);
+        break;
+    case 3:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC3NP))
+                        |(pol<<TIM_CCER_CC3NP_Pos);
+        break;
+    case 4:
+        timer->CCER = (timer->CCER&~(TIM_CCER_CC4NP))
+                        |(pol<<TIM_CCER_CC4NP_Pos);
+        break;
+    default:
+        return -1;
     }
+
+    /* Set div */
+    if( div > 0 ) div--;
+    timer->PSC = (uint16_t) (div);
+
+    /* Set top value */
+    timer->ARR = top;
+
+    /* Update */
+    timer->EGR = TIM_EGR_UG;
+
     return 0;
 }
 
 int PWM_StopTImer(TIM_TypeDef *timer) {
 
     timer->CR1 &= ~TIM_CR1_CEN;
+    // Should clear output */
+
     return 0;
 }
 
