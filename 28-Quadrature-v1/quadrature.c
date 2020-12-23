@@ -36,9 +36,9 @@
  *****************************************************************************/
 
 ///@{
-#define QUADRATURE_GPIO             GPIOD
-#define QUADRATURE_PIN0             7
-#define QUADRATURE_PIN1             6
+#define QUADRATURE_GPIO             GPIOC
+#define QUADRATURE_PIN0             15
+#define QUADRATURE_PIN1             14
 #define QUADRATURE_PINBUTTON        5
 ///@}
 

@@ -70,26 +70,29 @@
 
 
 
+
 /**
- * @brief Generates a word with 2-bit fields set according another word with 1-bit field.
- *        Each field is filled with the value v.
+ * @brief Generates a 32 bit word with 2-bit fields set according to a 16 bit word with 1-bit field.
+ *        Each 2-bit field is filled with the value v.
  *
  * @note  v must be 2 bit wide and not equal zero
  *
  */
-static uint32_t mk2from1(uint32_t m, uint32_t v) {
+static uint32_t mk2from1(uint16_t m, uint8_t f) {
 uint32_t x;
+uint32_t bv;
 
     if( !v )
         return 0;
 
     x = 0;
-    while( v ) {
-        if( m& 1 ) {
-            x |= v;
+    bv = 1<<15;
+    while( bv ) {
+        x<<=2;
+        if( m&bv ) {
+            x |= f;
         }
-        m>>=1;
-        v<<=2;
+        bv>>=1;
     }
     return x;
 }
