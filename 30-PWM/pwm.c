@@ -199,6 +199,9 @@ int af;
     if( !ptim )
         return -1;
 
+    if( ptim->type != TIMER_TYPEGENERAL )   // Not yet
+        return -100;
+
     pinfo = findpininformation(timer,channel,gpio,pin);
     if( !pinfo )
         return -2;

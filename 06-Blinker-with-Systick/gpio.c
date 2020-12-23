@@ -82,7 +82,7 @@ static uint32_t mk2from1(uint16_t m, uint8_t f) {
 uint32_t x;
 uint32_t bv;
 
-    if( !v )
+    if( !f )
         return 0;
 
     x = 0;
