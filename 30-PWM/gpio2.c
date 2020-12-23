@@ -106,14 +106,14 @@ uint32_t v1,v2,v,m,pinin,pinout;
 
     __DSB();
 
-    GPIO_ConfigurePins(gpio,input,GPIO_MODE_IN);
-    GPIO_ConfigurePins(gpio,output,GPIO_MODE_OUT);
+    GPIO_ConfigurePins(gpio,input,GPIO_CONF_IN);
+    GPIO_ConfigurePins(gpio,output,GPIO_CONF_OUT);
 
 }
 
 
 void GPIO_ConfigurePins(GPIO_TypeDef *gpio, uint16_t pins, uint32_t conf) {
-uint32_t v1,v2,m;
+uint32_t v2,m;
 uint32_t mode,speed,pull;
 
     GPIO_EnableClock(gpio);
@@ -139,7 +139,7 @@ uint32_t mode,speed,pull;
     // Set pullup
     if( conf & 0xF00 ) {
         m =  mk2from1(pins,GPIO_MODE_MASK);
-        pull = ((conf&0xF00)>>4)-1;
+        pull = ((conf&0xF00)>>8)-1;
         v2 = mk2from1(pins,pull);
         gpio->PUPDR = ((gpio->PUPDR&~m))|v2;
     }
