@@ -37,14 +37,9 @@
  * Stacks for tasks
  */
 //{
-#define TASKSTART_STACKSIZE 100
-#define TASKGREENLED_STACKSIZE 100
-#define TASKREDLED_STACKSIZE 100
-
-static OS_STK TaskStartStack[TASKSTART_STACKSIZE];
-static OS_STK TaskGreenLEDStack[TASKGREENLED_STACKSIZE];
-static OS_STK TaskRedLEDStack[TASKREDLED_STACKSIZE];
-
+static OS_STK TaskStartStack[APP_CFG_STARTUP_TASK_STK_SIZE];
+static OS_STK TaskGreenLEDStack[APP_CFG_GREENLED_TASK_STK_SIZE];
+static OS_STK TaskRedLEDStack[APP_CFG_REDLED_TASK_STK_SIZE];
 //}
 
 
@@ -141,16 +136,16 @@ void TaskStart(void *param) {
     // Create a task to blink Green LED
     OSTaskCreate(   TaskGreenLED,                               // Pointer to task
                     (void *) 0,                                 // Parameter
-                    (void *) &TaskGreenLEDStack[TASKGREENLED_STACKSIZE-1],
+                    (void *) &TaskGreenLEDStack[APP_CFG_GREENLED_TASK_STK_SIZE-1],
                                                                 // Initial value of SP
-                    TASKGREENLED_PRIO);                         // Task Priority/ID
+                    APP_CFG_GREENLED_TASK_PRIO);                         // Task Priority/ID
 
     // Create a task to blink Red LED
     OSTaskCreate(   TaskRedLED,                                 // Pointer to task
                     (void *) 0,                                 // Parameter
-                    (void *) &TaskRedLEDStack[TASKREDLED_STACKSIZE-1],
+                    (void *) &TaskRedLEDStack[APP_CFG_REDLED_TASK_STK_SIZE-1],
                                                                 // Initial value of SP
-                    TASKREDLED_PRIO);                           // Task Priority/ID
+                    APP_CFG_REDLED_TASK_PRIO);                           // Task Priority/ID
 
     // Effectively starting uC/OS
     __enable_irq();
@@ -168,9 +163,9 @@ int main(void) {
 
     // Create a task to start the other tasks
     OSTaskCreate(   TaskStart,                                          // Pointer to function
-                    (void *) 0,                                         // Parameter for task
-                    (void *) &TaskStartStack[TASKSTART_STACKSIZE-1],    // Initial value of SP
-                    TASKSTART_PRIO);                                    // Task Priority/ID
+            (void *) 0,                                                 // Parameter for task
+            (void *) &TaskStartStack[APP_CFG_STARTUP_TASK_STK_SIZE-1],  // Initial value of SP
+            APP_CFG_STARTUP_TASK_PRIO);                                 // Task Priority/ID
 
     // Enter uc/os and never returns
     OSStart();

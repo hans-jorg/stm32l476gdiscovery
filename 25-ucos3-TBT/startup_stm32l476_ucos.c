@@ -17,9 +17,6 @@
 
 #include "stm32l4xx.h"
 
-/* main : codigo do usuario */
-extern void main(void);
-
 #ifdef __GNUC__
 #define WEAK_DEFAULT_ATTRIBUTE  __attribute__((weak,alias("Default_Handler")))
 #define WEAK_ATTRIBUTE __attribute__((weak))
@@ -28,32 +25,32 @@ extern void main(void);
 #define WEAK_ATTRIBUTE
 #endif
 
-/* _main: inicializacao da biblioteca (newlib?) */
+/* user code main */
+extern void main(void);
+
+/* library _main (newlib) */
 void _main(void)                        WEAK_ATTRIBUTE;
 
-/* inicializacao CMSIS  */
+/* Initialization according CMSIS  */
 void SystemInit(void)                   WEAK_ATTRIBUTE;
 
-/* rotina de interrupcao default */
+/* Default interrupt handler */
 void Default_Handler(void)              WEAK_ATTRIBUTE;
 
-/* Rotinas para tratamento de excecoes definidas em CMSIS */
-/* Devem poder ser redefinidos */
+/* Cortex M standard interrupt routines according CMSIS */
 void Reset_Handler(void)                WEAK_ATTRIBUTE;            /* M0/M0+/M3/M4 */
 void NMI_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE;    /* M0/M0+/M3/M4 */
 void HardFault_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
 void SVC_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void PendSV_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void SysTick_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
 void MemManage_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
 void BusFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
 void UsageFault_Handler(void)           WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
 void DebugMon_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+/* Modified to point inside the uc/os code */
+void OS_CPU_PendSV_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void OS_CPU_SysTick_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
 
-/*
- * Rotinas para tratamento de interrupcoes
- * Variam com implementacao
- */
+/* STM32L476 interrupt routines */
 void WWDG_IRQHandler(void)               WEAK_DEFAULT_ATTRIBUTE;
 void PVD_IRQHandler(void)                WEAK_DEFAULT_ATTRIBUTE;
 void RTC_TAMP_STAMP_IRQHandler(void)     WEAK_DEFAULT_ATTRIBUTE;
@@ -183,8 +180,9 @@ void(*nvictable[])(void) = {
     SVC_Handler,                    /*11 : Software Interrupt         */
     DebugMon_Handler,               /*12 : Debug Monitor              */
     0,                              /*13 : reserved                   */
-    PendSV_Handler,                 /*14 : PendSV                     */
-    SysTick_Handler,                /*15 : SysTick                    */
+/* Modified to point inside the uc/os code */
+    OS_CPU_PendSV_Handler,          /*14 : PendSV                     */
+    OS_CPU_SysTick_Handler,         /*15 : SysTick                    */
    /* IRQ  (diferente para cada implementacao)                        */
    /* M0:  ? elementos                                                */
    /* M0+: ? elementos                                                */
@@ -340,14 +338,14 @@ void __attribute__((weak,naked)) Reset_Handler(void) {
 unsigned long *pSource;
 unsigned long *pDest;
 
-    /* Passo 1 : Copiar dados inicializados da flash para RAM (section DATA) */
+    /* Step 1 : Copy value for initialized data from FLASH (DATA section) */
     pSource = &_text_end;
     pDest   = &_data_start;
     while( pDest < &_data_end ) {
         *pDest++ = *pSource++;
     }
 
-    /* Passo 2 : Zerar variaveis nao inicializadas (section BSS) */
+    /* Step 2 : Zero unitialized data (BSS section) */
     pDest = &_bss_start;
     while( pDest < &_bss_end ) {
         *pDest++ = 0;
@@ -372,13 +370,13 @@ unsigned long *pDest;
     SCB->CPACR = t;
 #endif
 
-    /* Passo 3 : Chamar SystemInit conforme CMSIS */
+    /* Step 3 : Call SystemInit according CMSIS */
     SystemInit();
 
-    /* Passo 4 : Chamar _main para inicializar biblioteca */
+    /* Step 4 : Call _main to initialize library */
     _main();
 
-    /* Passo 5 : Chamar main */
+    /* Step 5 : Call main */
     main();
 
     _stop();

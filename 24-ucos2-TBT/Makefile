@@ -77,29 +77,38 @@ endif
 #
 
 # UCOS Dir
-UCOS_DIR=../../../Micrium/Software/uCOS-II/
+UCOS_DIR=../../../Micrium/Software/uC-OS2
 #UCOS_DIR=uCOS-II
 UCOS_SRCDIR=$(UCOS_DIR)/Source
 # Ports Dir for uCOS-II
-UCOS_PORTDIR=$(UCOS_DIR)/Ports/ARM-Cortex-M/GNU
+UCOS_PORTDIR=$(UCOS_DIR)/Ports/ARM-Cortex-M/ARMv7-M/
+UCOS_PORTDIRGNU=$(UCOS_DIR)/Ports/ARM-Cortex-M/ARMv7-M/GNU
+
 #UCOS_PORTDIR=uCOS-II/Ports/ARM-Cortex-M/GNU
 
 
 # Virtual path
-VPATH=$(UCOS_SRCDIR):$(UCOS_PORTDIR)
-
-# UCOS Include Path
-UCOS_INCLUDEPATH=$(UCOS_SRCDIR)  $(UCOS_PORTDIR)
+VPATH=$(UCOS_SRCDIR):$(UCOS_PORTDIR):$(UCOS_PORTDIRGNU)
 
 # UCOS Source Files
-UCOS_FILES=        os_mbox.c     os_mutex.c  os_sem.c    os_time.c os_core.c \
-                   os_flag.c     os_mem.c      os_q.c      os_task.c   os_tmr.c
-UCOS_PORTCFILES=   os_cpu_c.c    os_dbg.c
-UCOS_PORTASMFILES= os_cpu_a.S
+UCOS_FILES=         os_mbox.c     os_mutex.c  os_sem.c    os_time.c os_core.c           \
+                    os_flag.c     os_mem.c      os_q.c      os_task.c   os_tmr.c
+UCOS_PORTCFILES=    os_cpu_c.c
+UCOS_PORTCFILESGNU= os_dbg.c
+UCOS_PORTAFILESGNU= os_cpu_a.S
 
-UCOS_SRCFILES= $(addprefix $(UCOS_SRCDIR)/,$(UCOS_FILES) )  $(addprefix $(UCOS_PORTDIR)/,$(UCOS_PORTCFILES))  $(addprefix $(UCOS_PORTDIR)/,$(UCOS_PORTASMFILES)  )
+UCOS_SRCFILES=      $(addprefix $(UCOS_SRCDIR)/,$(UCOS_FILES) )                         \
+                    $(addprefix $(UCOS_PORTDIR)/,$(UCOS_PORTCFILES))                    \
+                    $(addprefix $(UCOS_PORTDIRGNU)/,$(UCOS_PORTCFILESGNU))              \
+                    $(addprefix $(UCOS_PORTDIRGNU)/,$(UCOS_PORTAFILES))
 
-UCOS_OBJFILES= $(addprefix ${OBJDIR}/, $(notdir $(UCOS_FILES:.c=.o) $(UCOS_PORTCFILES:.c=.o) $(UCOS_PORTASMFILES:.S=.o)))
+UCOS_OBJFILES=      $(addprefix ${OBJDIR}/, $(notdir $(UCOS_FILES:.c=.o)))              \
+                    $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTCFILES:.c=.o)))         \
+                    $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTCFILESGNU:.c=.o)))      \
+                    $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTAFILESGNU:.S=.o)))
+
+# UCOS Include Path
+UCOS_INCLUDEPATH=   $(UCOS_SRCDIR)  $(UCOS_PORTDIR) $(UCOS_PORTDIRGNU)
 
 #
 # Source files
@@ -125,6 +134,21 @@ PREFIX:=arm-none-eabi
 #
 OBJFILES=$(addprefix ${OBJDIR}/,$(notdir $(SRCFILES:.c=.o))) $(UCOS_OBJFILES)
 
+#
+# Object files
+#
+#OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
+#OBJFILES+= $(UCOS_OBJFILES)
+
+#
+# Include path
+#
+CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
+CMSISINCDIR=${CMSISDIR}/Include
+INCLUDEPATH= . \
+             $(UCOS_INCLUDEPATH) \
+             ${CMSISDEVINCDIR} \
+             ${CMSISINCDIR}
 
 #
 # For gcc-arm-embedded
@@ -425,22 +449,6 @@ LIBC:=${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
 LIBM:=${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
 
 #
-# Object files
-#
-OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
-OBJFILES+= $(UCOS_OBJFILES)
-
-#
-# Include path
-#
-CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
-CMSISINCDIR=${CMSISDIR}/Include
-INCLUDEPATH= . \
-             $(UCOS_INCLUDEPATH) \
-             ${CMSISDEVINCDIR} \
-             ${CMSISINCDIR}
-
-#
 #
 # The flags passed to the assembler.
 #
@@ -527,6 +535,7 @@ ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
 	${LD} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
 	      ${LDFLAGS} -o ${@} $(OBJFILES) \
+	       --print-memory-usage          \
 	      '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf

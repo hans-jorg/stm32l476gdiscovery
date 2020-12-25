@@ -1,12 +1,21 @@
 
-/*
- * Codigo de inicializacao para ARM
- * Deve ser adaptado para processador e compilador
- */
+/**
+ * @file     startup_stm32l476.c
+ * @brief    startup code according CMSIS
+ * @version  V1.0
+ * @date     23/01/2016
+ *
+ * @note     Provides an Interrupt Vector Table to be stored at address 0
+ * @note     Provides default routines for interrupts
+ * @note     Copy initial values from flash to RAM
+ * @note     Calls SystemInit
+ * @note     Calls _main (It provides one, but it is automatically redefined)
+ * @note     Calls main
+ * @note     This code must be adapted for processor and compiler
+ *
+ ******************************************************************************/
 
 #include "stm32l4xx.h"
-/* main : codigo do usuario */
-extern void main(void);
 
 #ifdef __GNUC__
 #define WEAK_DEFAULT_ATTRIBUTE  __attribute__((weak,alias("Default_Handler")))
@@ -16,32 +25,31 @@ extern void main(void);
 #define WEAK_ATTRIBUTE
 #endif
 
-/* _main: inicializacao da biblioteca (newlib?) */
-void _main(void)                        WEAK_ATTRIBUTE;
+/* user code main */
+extern void main(void);
 
-/* inicializacao CMSIS  */
-void SystemInit(void)                   WEAK_ATTRIBUTE;
+/* library _main (newlib) */
+void _main(void)                         WEAK_ATTRIBUTE;
 
-/* rotina de interrupcao default */
-void Default_Handler(void)              WEAK_ATTRIBUTE;
+/* Initialization according CMSIS  */
+void SystemInit(void)                    WEAK_ATTRIBUTE;
 
-/* Rotinas para tratamento de excecoes definidas em CMSIS */
-/* Devem poder ser redefinidos */
-void Reset_Handler(void)                WEAK_ATTRIBUTE;            /* M0/M0+/M3/M4 */
-void NMI_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE;    /* M0/M0+/M3/M4 */
-void HardFault_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void SVC_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void PendSV_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void SysTick_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void MemManage_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void BusFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void UsageFault_Handler(void)           WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void DebugMon_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+/* Default interrupt handler */
+void Default_Handler(void)               WEAK_ATTRIBUTE;
 
-/*
- * Rotinas para tratamento de interrupcoes
- * Variam com implementacao
- */
+/* Cortex M standard interrupt routines according CMSIS */
+void Reset_Handler(void)                 WEAK_ATTRIBUTE;            /* M0/M0+/M3/M4 */
+void NMI_Handler(void)                   WEAK_DEFAULT_ATTRIBUTE;    /* M0/M0+/M3/M4 */
+void HardFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void SVC_Handler(void)                   WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void MemManage_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void BusFault_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void UsageFault_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void DebugMon_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void PendSV_Handler(void)                WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void SysTick_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+
+/* STM32L476 interrupt routines */
 void WWDG_IRQHandler(void)               WEAK_DEFAULT_ATTRIBUTE;
 void PVD_IRQHandler(void)                WEAK_DEFAULT_ATTRIBUTE;
 void RTC_TAMP_STAMP_IRQHandler(void)     WEAK_DEFAULT_ATTRIBUTE;
@@ -126,9 +134,9 @@ void RNG_IRQHandler(void)                WEAK_DEFAULT_ATTRIBUTE;
 void FPU_IRQHandler(void)                WEAK_DEFAULT_ATTRIBUTE;
 
 
-/*
- * Simbolos definidos no script de ligacao
- * Sao usados para delimitar areas
+/**
+ * @brief Symbols defined by loader
+ *
  */
 extern unsigned long _text_start;
 extern unsigned long _text_end;
@@ -140,12 +148,13 @@ extern unsigned long _stack_start;
 //extern unsigned long _stack_end;
 extern void(_stack_end)(void);
 
-/*
- * Tabela de excecoes/interrupcoes
- * Deve ficar na secao nvic para ser armazenada na flash antes de tudo
+/**
+ * @brief Interrupt vector table
  *
- * E uma tabela de ponteiro para funcoes  void (*pFunc)(void)
- * Deve poder ser sobreescrito (weak)
+ * @note Must be in section isr_vector, so the loader store it at address 0
+ * @note Every routine can be redefined in other module
+ * @note All routines must return void and have no parameter
+ *
  */
 
 __attribute__ ((weak,section(".isr_vector")))
@@ -262,34 +271,48 @@ void(*nvictable[])(void) = {
 
 
 static uint32_t InterruptNumber = 0;
-/*
- * Default Interrupt Handler (Halts)
+
+/**
+ * @brief Default Interrupt Handler routine
+ *
+ * @note It halts using an infinite loop
+ * @note The interrupt source is stored in InterruptNumber variable
  */
 
 void Default_Handler(void) {
-    InterruptNumber = SCB->ICSR;
+    // Look at this variable to see what was the interrupt source
+    InterruptNumber = SCB->ICSR&0x1FF;
     while(1) {} /* Loop */
     /* NEVER */
 }
 
-/*
- * default SystemInit caso nao seja definido um
+/**
+ * @brief Default SystemInit routine
+ *
+ * @note It can be redefined in other module
+ *
  */
 
 void SystemInit(void) {
 
 }
 
-/*
- * default _main caso nao seja definido uma
+/**
+ * @brief Default _main routine
+ *
+ * @note It can be redefined in other module
+ *
  */
 
 void _main(void) {
 
 }
 
-/*
- * rotina para parar tudo
+/**
+ * @brief _stop routine
+ *
+ * @note It halts using an infinite loop
+ *
  */
 
 void _stop(void) {
@@ -298,33 +321,60 @@ void _stop(void) {
 
 }
 
-/*
- * Ponto de entrada principal
+/**
+ * @brief Reset Handler
+ *
+ * @note Copies initial values of variables from FLASH to RAM
+ * @note Zeroes uninitialized variables
+ * @note Calls SystemInit
+ * @note Calls _main
+ * @note Call main
+ * @note Call _stop if main returns
  */
+
 void __attribute__((weak,naked)) Reset_Handler(void) {
 unsigned long *pSource;
 unsigned long *pDest;
 
-    /* Passo 1 : Copiar dados inicializados da flash para RAM (section DATA) */
+    /* Step 1 : Copy value for initialized data from FLASH (DATA section) */
     pSource = &_text_end;
     pDest   = &_data_start;
     while( pDest < &_data_end ) {
         *pDest++ = *pSource++;
     }
 
-    /* Passo 2 : Zerar variaveis nao inicializadas (section BSS) */
+    /* Step 2 : Zero unitialized data (BSS section) */
     pDest = &_bss_start;
     while( pDest < &_bss_end ) {
         *pDest++ = 0;
     }
 
-    /* Passo 3 : Chamar SystemInit conforme CMSIS */
+#ifdef ENABLE_FPU
+#define SCB_CPACR_CP11_M      (3<<22)
+#define SCB_CPACR_CP10_M      (3<<20)
+#define SCB_CPACR_CP11_FULL_V (3<<22)
+#define SCB_CPACR_CP10_FULL_V (3<<20)
+
+    //
+    // Enable the floating-point unit.  This must be done here to handle the
+    // case where main() uses floating-point and the function prologue saves
+    // floating-point registers (which will fault if floating-point is not
+    // enabled).
+
+    //
+    uint32_t t = SCB->CPACR;
+    t &= ~(SCB_CPACR_CP11_M|SCB_CPACR_CP10_M);
+    t |= SCB_CPACR_CP11_FULL_V|SCB_CPACR_CP10_FULL_V ;
+    SCB->CPACR = t;
+#endif
+
+    /* Step 3 : Call SystemInit according CMSIS */
     SystemInit();
 
-    /* Passo 4 : Chamar _main para inicializar biblioteca */
+    /* Step 4 : Call _main to initialize library */
     _main();
 
-    /* Passo 5 : Chamar main */
+    /* Step 5 : Call main */
     main();
 
     _stop();

@@ -57,6 +57,21 @@ PARTCLASS=STM32L476xx
 # Used to find correct CMSIS include file
 PARTCLASSCMSIS=STM32L4xx
 
+
+#
+# Source files
+#
+SRCFILES=$(wildcard *.c)
+#SRCFILES= main.c
+
+#
+# Suppress warnings
+# Comment out to have verbose output
+#MAKEFLAGS+= --silent
+.SILENT:
+
+
+
 #
 # Path
 #
@@ -82,15 +97,17 @@ UCOS_DIR=../../../Micrium/Software
 #UCOS_DIR=.
 
 # uCOS-III is the main requisite
-UCOS_SRCDIR=$(UCOS_DIR)/uCOS-III/Source
+UCOS_SRCDIR=$(UCOS_DIR)/uC-OS3/Source
 #UCOS_PORTDIR=$(UCOS_DIR)/Ports/ARM-Cortex-M3/Generic/GNU
-UCOS_PORTDIR=$(UCOS_DIR)/uCOS-III/Ports/ARM-Cortex-M/GNU
+UCOS_PORTDIR=$(UCOS_DIR)/uC-OS3/Ports/ARM-Cortex-M/ARMv7-M
+UCOS_PORTDIRGNU=$(UCOS_DIR)/uC-OS3/Ports/ARM-Cortex-M/ARMv7-M/GNU
 
 # uC/CPU is needed by uC/OS
 UCCPU_DIR=$(UCOS_DIR)/uC-CPU
 #UCCPU_DIR=./uC-CPU
 UCCPU_SRCDIR=$(UCCPU_DIR)
-UCCPU_PORTDIR=$(UCCPU_DIR)/Ports/ARM-Cortex-M/GNU
+UCCPU_PORTDIR=$(UCCPU_DIR)/ARM-Cortex-M/ARMv7-M
+UCCPU_PORTDIRGNU=$(UCCPU_DIR)/ARM-Cortex-M/ARMv7-M/GNU
 
 # uC/Lib is needed by uC/CPU
 UCLIB_DIR=$(UCOS_DIR)/uC-LIB
@@ -99,68 +116,56 @@ UCLIB_PORTDIR=$(UCLIB_DIR)/ARM-Cortex-M3/GNU
 
 
 # Virtual path
-VPATH=$(UCOS_SRCDIR):$(UCOS_PORTDIR) $(UCCPU_SRCDIR) $(UCCPU_PORTDIR) $(UCLIB_SRCDIR) $(UCLIB_PORTDIR)
+VPATH=              $(UCOS_SRCDIR)  $(UCOS_PORTDIR)  $(UCOS_PORTDIRGNU)          \
+                    $(UCCPU_SRCDIR) $(UCCPU_PORTDIR) $(UCCPU_PORTDIRGNU)         \
+                    $(UCLIB_SRCDIR) $(UCLIB_PORTDIR)
 
 # UCOS Include Path
-UCOS_INCLUDEPATH=   $(UCOS_SRCDIR)  $(UCOS_PORTDIR) \
-                    $(UCCPU_SRCDIR) $(UCCPU_PORTDIR)   \
+UCOS_INCLUDEPATH=   $(UCOS_SRCDIR)  $(UCOS_PORTDIR)  $(UCOS_PORTDIRGNU)          \
+                    $(UCCPU_SRCDIR) $(UCCPU_PORTDIR) $(UCCPU_PORTDIRGNU)         \
                     $(UCLIB_SRCDIR) $(UCLIB_PORTDIR)
 
 # UCOS Source Files
 UCOS_FILES=         os_cfg_app.c    os_mutex.c      os_stat.c       os_tmr.c     \
                     os_core.c       os_mem.c        os_prio.c       os_task.c    \
-                    os_dbg.c        os_q.c          os_tick.c    \
+                    os_dbg.c        os_q.c          os_tick.c                    \
                     os_flag.c       os_msg.c        os_sem.c        os_time.c    \
                     os_var.c
 UCOS_PORTCFILES=    os_cpu_c.c
-UCOS_PORTASMFILES=  os_cpu_a.s
+UCOS_PORTAFILES=    os_cpu_a.S
 
 # uCCPU Source Files
 UCCPU_FILES=        cpu_core.c
 UCCPU_PORTFILES=    cpu_c.c
-UCCPU_PORTASMFILES= cpu_a.s
+UCCPU_PORTAFILES=   cpu_a.s
 
 # uCLIB Source Files
 UCLIB_FILES=        lib_math.c      lib_mem.c       lib_str.c       lib_ascii.c
 UCLIB_PORTFILES=
-uCLIB_PORTASMFILES= libmem_a.s
+uCLIB_PORTAFILES=   libmem_a.s
 
 
 # All ucOS Source Files
 UCOS_SRCFILES=  $(addprefix $(UCOS_SRCDIR)/, $(UCOS_FILES))                  \
                 $(addprefix $(UCOS_PORTDIR)/, $(UCOS_PORTCFILES))            \
-                $(addprefix $(UCOS_PORTDIR)/, $(UCOS_PORTASMFILES))          \
+                $(addprefix $(UCOS_PORTDIRGNU)/, $(UCOS_PORTAFILES))         \
                 $(addprefix $(UCCPU_SRCDIR)/, $(UCCPU_FILES))                \
                 $(addprefix $(UCCPU_PORTDIR)/, $(UCCPU_PORTFILES))           \
-                $(addprefix $(UCCPU_PORTDIR)/, $(UCCPU_PORTASMFILES))        \
+                $(addprefix $(UCCPU_PORTDIRGNU)/, $(UCCPU_PORTAFILES))       \
                 $(addprefix $(UCLIB_SRCDIR)/, $(UCLIB_FILES))                \
                 $(addprefix $(UCLIB_PORTDIR)/, $(UCLIB_PORTFILES))           \
-                $(addprefix $(UCLIB_PORTDIR)/, $(UCLIB_PORTASMFILES))        \
+                $(addprefix $(UCLIB_PORTDIRGNU)/, $(UCLIB_PORTAFILES))
 
 # All ucOS Object Files
 UCOS_OBJFILES=  $(addprefix $(OBJDIR)/, $(UCOS_FILES:.c=.o))                 \
                 $(addprefix $(OBJDIR)/, $(UCOS_PORTCFILES:.c=.o))            \
-                $(addprefix $(OBJDIR)/, $(UCOS_PORTASMFILES:.s=.o))          \
+                $(addprefix $(OBJDIR)/, $(UCOS_PORTAFILES:.S=.o))            \
                 $(addprefix $(OBJDIR)/, $(UCCPU_FILES:.c=.o))                \
                 $(addprefix $(OBJDIR)/, $(UCCPU_PORTFILES:.c=.o))            \
-                $(addprefix $(OBJDIR)/, $(UCCPU_PORTASMFILES:.s=.o))         \
+                $(addprefix $(OBJDIR)/, $(UCCPU_PORTAFILES:.s=.o))           \
                 $(addprefix $(OBJDIR)/, $(UCLIB_FILES:.c=.o))                \
-                $(addprefix $(OBJDIR)/, $(UCLIB_PORTFILES:.c=.o))            \
-                $(addprefix $(OBJDIR)/, $(UCLIB_PORTASMFILES:.s=.o))
-
-
-
-#
-# Source files
-#
-SRCFILES=$(wildcard *.c)
-#SRCFILES= main.c
-
-#
-# Suppress warnings
-# Comment out to have verbose output
-#MAKEFLAGS+= --silent
-.SILENT:
+                $(addprefix $(OBJDIR)/, $(UCLIB_PORTCFILES:.c=.o))           \
+                $(addprefix $(OBJDIR)/, $(UCLIB_PORTAFILES:.s=.o))
 
 
 #
@@ -579,6 +584,7 @@ ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
 	${LD} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
 	      ${LDFLAGS} -o ${@} $(OBJFILES) \
+	       --print-memory-usage          \
 	      '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf

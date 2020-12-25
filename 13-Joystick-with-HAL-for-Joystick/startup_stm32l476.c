@@ -17,9 +17,6 @@
 
 #include "stm32l4xx.h"
 
-/* main : codigo do usuario */
-extern void main(void);
-
 #ifdef __GNUC__
 #define WEAK_DEFAULT_ATTRIBUTE  __attribute__((weak,alias("Default_Handler")))
 #define WEAK_ATTRIBUTE __attribute__((weak))
@@ -28,32 +25,31 @@ extern void main(void);
 #define WEAK_ATTRIBUTE
 #endif
 
-/* _main: inicializacao da biblioteca (newlib?) */
-void _main(void)                        WEAK_ATTRIBUTE;
+/* user code main */
+extern void main(void);
 
-/* inicializacao CMSIS  */
-void SystemInit(void)                   WEAK_ATTRIBUTE;
+/* library _main (newlib) */
+void _main(void)                         WEAK_ATTRIBUTE;
 
-/* rotina de interrupcao default */
-void Default_Handler(void)              WEAK_ATTRIBUTE;
+/* Initialization according CMSIS  */
+void SystemInit(void)                    WEAK_ATTRIBUTE;
 
-/* Rotinas para tratamento de excecoes definidas em CMSIS */
-/* Devem poder ser redefinidos */
-void Reset_Handler(void)                WEAK_ATTRIBUTE;            /* M0/M0+/M3/M4 */
-void NMI_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE;    /* M0/M0+/M3/M4 */
-void HardFault_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void SVC_Handler(void)                  WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void PendSV_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void SysTick_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
-void MemManage_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void BusFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void UsageFault_Handler(void)           WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
-void DebugMon_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+/* Default interrupt handler */
+void Default_Handler(void)               WEAK_ATTRIBUTE;
 
-/*
- * Rotinas para tratamento de interrupcoes
- * Variam com implementacao
- */
+/* Cortex M standard interrupt routines according CMSIS */
+void Reset_Handler(void)                 WEAK_ATTRIBUTE;            /* M0/M0+/M3/M4 */
+void NMI_Handler(void)                   WEAK_DEFAULT_ATTRIBUTE;    /* M0/M0+/M3/M4 */
+void HardFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void SVC_Handler(void)                   WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void MemManage_Handler(void)             WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void BusFault_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void UsageFault_Handler(void)            WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void DebugMon_Handler(void)              WEAK_DEFAULT_ATTRIBUTE ;   /* M3/M4 */
+void PendSV_Handler(void)                WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+void SysTick_Handler(void)               WEAK_DEFAULT_ATTRIBUTE ;   /* M0/M0+/M3/M4 */
+
+/* STM32L476 interrupt routines */
 void WWDG_IRQHandler(void)               WEAK_DEFAULT_ATTRIBUTE;
 void PVD_IRQHandler(void)                WEAK_DEFAULT_ATTRIBUTE;
 void RTC_TAMP_STAMP_IRQHandler(void)     WEAK_DEFAULT_ATTRIBUTE;
@@ -340,26 +336,45 @@ void __attribute__((weak,naked)) Reset_Handler(void) {
 unsigned long *pSource;
 unsigned long *pDest;
 
-    /* Passo 1 : Copiar dados inicializados da flash para RAM (section DATA) */
+    /* Step 1 : Copy value for initialized data from FLASH (DATA section) */
     pSource = &_text_end;
     pDest   = &_data_start;
     while( pDest < &_data_end ) {
         *pDest++ = *pSource++;
     }
 
-    /* Passo 2 : Zerar variaveis nao inicializadas (section BSS) */
+    /* Step 2 : Zero unitialized data (BSS section) */
     pDest = &_bss_start;
     while( pDest < &_bss_end ) {
         *pDest++ = 0;
     }
 
-    /* Passo 3 : Chamar SystemInit conforme CMSIS */
+#ifdef ENABLE_FPU
+#define SCB_CPACR_CP11_M      (3<<22)
+#define SCB_CPACR_CP10_M      (3<<20)
+#define SCB_CPACR_CP11_FULL_V (3<<22)
+#define SCB_CPACR_CP10_FULL_V (3<<20)
+
+    //
+    // Enable the floating-point unit.  This must be done here to handle the
+    // case where main() uses floating-point and the function prologue saves
+    // floating-point registers (which will fault if floating-point is not
+    // enabled).
+
+    //
+    uint32_t t = SCB->CPACR;
+    t &= ~(SCB_CPACR_CP11_M|SCB_CPACR_CP10_M);
+    t |= SCB_CPACR_CP11_FULL_V|SCB_CPACR_CP10_FULL_V ;
+    SCB->CPACR = t;
+#endif
+
+    /* Step 3 : Call SystemInit according CMSIS */
     SystemInit();
 
-    /* Passo 4 : Chamar _main para inicializar biblioteca */
+    /* Step 4 : Call _main to initialize library */
     _main();
 
-    /* Passo 5 : Chamar main */
+    /* Step 5 : Call main */
     main();
 
     _stop();

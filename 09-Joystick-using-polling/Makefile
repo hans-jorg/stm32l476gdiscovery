@@ -490,6 +490,7 @@ ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
 	${LD} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
 	      ${LDFLAGS} -o ${@} $(OBJFILES) \
+	       --print-memory-usage          \
 	      '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf
