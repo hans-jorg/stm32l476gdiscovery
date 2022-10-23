@@ -14,4 +14,4 @@ void    Quadrature_Reset(void);
 void    Quadrature_Load(int v);
 void    Quadrature_Process(void);
 
-#endif // LCD_H
+#endif // QUADRATURE_H
